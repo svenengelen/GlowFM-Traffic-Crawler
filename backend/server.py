@@ -44,7 +44,10 @@ db = client[DATABASE_NAME]
 class TrafficJam(BaseModel):
     id: str
     road: str
-    location: str
+    direction: str
+    from_exit: str
+    to_exit: str
+    cause: str
     delay_minutes: int
     length_km: float
     last_updated: datetime
