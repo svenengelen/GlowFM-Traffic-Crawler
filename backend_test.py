@@ -491,6 +491,81 @@ class ANWBTrafficTester:
             return False
 
         return True
+        
+    def test_scraper_refresh(self):
+        """Test the scraper's ability to refresh and extract traffic data"""
+        print("\n🔍 Testing Scraper Refresh...")
+        
+        # First, trigger a refresh
+        success, response = self.run_test(
+            "Traffic Refresh Endpoint",
+            "POST",
+            "traffic/refresh",
+            200
+        )
+        
+        if not success:
+            print("❌ Failed to trigger traffic refresh")
+            return False
+            
+        # Wait for the scraper to complete (it runs asynchronously)
+        print("⏳ Waiting for scraper to complete (5 seconds)...")
+        import time
+        time.sleep(5)
+        
+        # Now check the traffic data
+        success, response = self.run_test(
+            "Traffic Data After Refresh",
+            "GET",
+            "traffic",
+            200
+        )
+        
+        if not success:
+            print("❌ Failed to get traffic data after refresh")
+            return False
+            
+        # Check if any traffic jams were found
+        traffic_jams = response.get('traffic_jams', [])
+        total_jams = len(traffic_jams)
+        
+        print(f"Found {total_jams} traffic jams after refresh")
+        
+        if total_jams == 0:
+            print("❌ No traffic jams found after refresh - scraper may not be extracting data correctly")
+            return False
+        else:
+            print(f"✅ Scraper found {total_jams} traffic jams")
+            
+            # Check if A270 is among the roads with traffic jams
+            a270_jams = [jam for jam in traffic_jams if jam['road'] == 'A270']
+            if a270_jams:
+                print(f"✅ Found {len(a270_jams)} traffic jams for A270")
+                for jam in a270_jams:
+                    print(f"  - Delay: {jam['delay_minutes']} min, Length: {jam['length_km']} km")
+                    print(f"  - Direction: {jam['direction']}")
+                    print(f"  - Route: {jam['route_details']}")
+                    print(f"  - Cause: {jam['cause']}")
+            else:
+                print("❌ No A270 traffic jams found after refresh - scraper may not be detecting A270 traffic")
+                
+            # Check the last_updated timestamp
+            last_updated = response.get('last_updated')
+            if last_updated:
+                from datetime import datetime
+                try:
+                    last_updated_dt = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+                    now = datetime.now()
+                    diff_minutes = (now - last_updated_dt).total_seconds() / 60
+                    
+                    if diff_minutes < 10:
+                        print(f"✅ Data was recently updated ({diff_minutes:.1f} minutes ago)")
+                    else:
+                        print(f"⚠️ Data may be stale (last updated {diff_minutes:.1f} minutes ago)")
+                except:
+                    print(f"⚠️ Could not parse last_updated timestamp: {last_updated}")
+            
+        return total_jams > 0
 
 def main():
     # Setup
