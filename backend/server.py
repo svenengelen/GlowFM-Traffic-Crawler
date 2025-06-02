@@ -125,6 +125,8 @@ async def scrape_traffic_data():
         # Find all traffic list roads
         road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
         
+        logger.info(f"Found {len(road_articles)} road articles to process")
+        
         for article in road_articles:
             try:
                 # Extract road number
@@ -138,28 +140,29 @@ async def scrape_traffic_data():
                 if road not in TARGET_ROADS:
                     continue
                 
-                # Check if there's traffic jam data
-                delay_div = article.find('div', class_='sc-fd0a2c7e-6')
-                if delay_div:
-                    spans = delay_div.find_all('span')
-                    if len(spans) >= 2:
-                        delay_text = spans[0].get_text(strip=True)
-                        length_text = spans[1].get_text(strip=True)
-                        
-                        if delay_text and length_text:
-                            # Extract location from h3 tag
-                            location_h3 = article.find('h3', class_='sc-fd0a2c7e-5')
-                            location = location_h3.get_text(strip=True) if location_h3 else ""
+                logger.info(f"Processing road {road}")
+                
+                # Method 1: Check for specific location-based traffic jams (like A15, A27)
+                location_h3 = article.find('h3', class_='sc-fd0a2c7e-5')
+                if location_h3:
+                    # This road has specific location info with delays
+                    delay_div = article.find('div', class_='sc-fd0a2c7e-6')
+                    if delay_div:
+                        spans = delay_div.find_all('span')
+                        if len(spans) >= 2:
+                            delay_text = spans[0].get_text(strip=True)
+                            length_text = spans[1].get_text(strip=True)
                             
-                            # Clean location text (remove arrow icons)
-                            location = re.sub(r'\s+', ' ', location).strip()
-                            
-                            delay_minutes = extract_delay_minutes(delay_text)
-                            length_km = extract_length_km(length_text)
-                            matching_city = find_matching_city(location)
-                            
-                            # Only include if it matches our city criteria or if no city filter
-                            if matching_city or not TARGET_CITIES:
+                            if delay_text and length_text and delay_text.startswith('+'):
+                                location = location_h3.get_text(strip=True)
+                                # Clean location text (remove arrow icons)
+                                location = re.sub(r'\s+', ' ', location).strip()
+                                
+                                delay_minutes = extract_delay_minutes(delay_text)
+                                length_km = extract_length_km(length_text)
+                                matching_city = find_matching_city(location)
+                                
+                                # Include all target roads, regardless of city match
                                 traffic_jam = TrafficJam(
                                     id=str(uuid.uuid4()),
                                     road=road,
@@ -171,9 +174,56 @@ async def scrape_traffic_data():
                                     last_updated=datetime.utcnow()
                                 )
                                 traffic_jams.append(traffic_jam)
+                                logger.info(f"Added traffic jam: {road} - {location} - {delay_text}")
+                
+                # Method 2: Check for roads with traffic count but no specific location (like A67)
+                else:
+                    # Look for traffic totals indicator
+                    totals_div = article.find('div', {'data-test-id': 'traffic-list-road-totals'})
+                    if totals_div:
+                        # This road has traffic jams indicated by count
+                        count_span = totals_div.find('span', {'aria-label': True})
+                        if count_span:
+                            aria_label = count_span.get('aria-label', '')
+                            if 'files' in aria_label:
+                                # Extract traffic count
+                                count_text = count_span.get_text(strip=True)
+                                try:
+                                    traffic_count = int(count_text)
+                                    if traffic_count > 0:
+                                        # Look for delay and length info
+                                        delay_div = article.find('div', class_='sc-fd0a2c7e-6')
+                                        if delay_div:
+                                            spans = delay_div.find_all('span')
+                                            if len(spans) >= 2:
+                                                delay_text = spans[0].get_text(strip=True)
+                                                length_text = spans[1].get_text(strip=True)
+                                                
+                                                if delay_text and length_text:
+                                                    delay_minutes = extract_delay_minutes(delay_text)
+                                                    length_km = extract_length_km(length_text)
+                                                    
+                                                    # Create multiple entries for roads with multiple jams
+                                                    for i in range(traffic_count):
+                                                        traffic_jam = TrafficJam(
+                                                            id=str(uuid.uuid4()),
+                                                            road=road,
+                                                            location=f"Sectie {i+1}" if traffic_count > 1 else "Algemeen",
+                                                            delay_minutes=delay_minutes,
+                                                            length_km=length_km / traffic_count if traffic_count > 1 else length_km,
+                                                            delay_text=delay_text,
+                                                            city=None,  # No specific city for these roads
+                                                            last_updated=datetime.utcnow()
+                                                        )
+                                                        traffic_jams.append(traffic_jam)
+                                                    
+                                                    logger.info(f"Added {traffic_count} traffic jam(s): {road} - {delay_text} - {length_text}")
+                                except ValueError:
+                                    # Could not parse count, skip
+                                    pass
                 
             except Exception as e:
-                logger.warning(f"Error processing road article: {e}")
+                logger.warning(f"Error processing road article for {road}: {e}")
                 continue
         
         # Store in database
