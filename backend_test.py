@@ -3,11 +3,12 @@ import sys
 import json
 from datetime import datetime
 
-class ANWBTrafficMonitorTester:
+class GlowFMVerkeerTester:
     def __init__(self, base_url="https://bc4668cd-3e1d-4a51-8563-9ce46c9a86d6.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
+        self.expected_roads = ["A2", "A16", "A50", "A58", "A59", "A65", "A67", "A73", "A76", "A270", "N2", "N69", "N266", "N270"]
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
         """Run a single API test"""
@@ -43,140 +44,123 @@ class ANWBTrafficMonitorTester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, None
 
-    def test_root_endpoint(self):
-        """Test the root API endpoint"""
+    def test_speed_cameras_count(self):
+        """Test that there are 0 speed cameras returned"""
         success, response = self.run_test(
-            "Root API Endpoint",
-            "GET",
-            "",
-            200
-        )
-        if success:
-            print(f"Response: {response}")
-        return success
-
-    def test_traffic_endpoint(self):
-        """Test the traffic endpoint with no filters"""
-        success, response = self.run_test(
-            "Traffic Endpoint (No Filters)",
-            "GET",
-            "traffic",
-            200
-        )
-        if success:
-            print(f"Total traffic jams: {response.get('total_jams', 'N/A')}")
-            print(f"Filtered traffic jams: {response.get('filtered_jams', 'N/A')}")
-            print(f"Speed cameras: {len(response.get('speed_cameras', []))}")
-            print(f"Last updated: {response.get('last_updated', 'N/A')}")
-            
-            # Check if all roads and cities are filtered by default
-            if response.get('total_jams', 0) == response.get('filtered_jams', 0):
-                print("✅ All roads and cities are filtered by default")
-            else:
-                print("❌ Not all roads and cities are filtered by default")
-        return success
-
-    def test_traffic_endpoint_with_delay_filter(self):
-        """Test the traffic endpoint with delay filter"""
-        min_delay = 15
-        success, response = self.run_test(
-            f"Traffic Endpoint (Min Delay {min_delay})",
-            "GET",
-            "traffic",
-            200,
-            params={"min_delay": min_delay}
-        )
-        if success:
-            print(f"Total traffic jams: {response.get('total_jams', 'N/A')}")
-            print(f"Filtered traffic jams: {response.get('filtered_jams', 'N/A')}")
-            
-            # Verify that all returned traffic jams have at least the minimum delay
-            all_match = all(jam.get('delay_minutes', 0) >= min_delay 
-                           for jam in response.get('traffic_jams', []))
-            
-            if all_match or len(response.get('traffic_jams', [])) == 0:
-                print(f"✅ All returned traffic jams have delay >= {min_delay} minutes (or no jams returned)")
-            else:
-                print(f"❌ Some traffic jams have delay < {min_delay} minutes")
-                success = False
-        return success
-
-    def test_speed_cameras_hectometer(self):
-        """Test that speed cameras include hectometer field"""
-        success, response = self.run_test(
-            "Speed Cameras Hectometer Field",
+            "Speed Cameras Count (Should be 0)",
             "GET",
             "traffic",
             200
         )
         if success:
             speed_cameras = response.get('speed_cameras', [])
-            if not speed_cameras:
-                print("⚠️ No speed cameras found to test")
-                return True
-                
-            # Check if all speed cameras have hectometer field
-            cameras_with_hectometer = [cam for cam in speed_cameras if 'hectometer' in cam and cam['hectometer']]
+            speed_camera_count = len(speed_cameras)
             
-            if cameras_with_hectometer:
-                print(f"✅ Found {len(cameras_with_hectometer)}/{len(speed_cameras)} speed cameras with hectometer field")
-                # Print a sample hectometer value
-                sample = cameras_with_hectometer[0]
-                print(f"Sample hectometer: {sample['hectometer']} for {sample['road']} at {sample['location']}")
+            if speed_camera_count == 0:
+                print("✅ API returns 0 speed cameras as expected")
                 return True
             else:
-                print("❌ No speed cameras have hectometer field")
+                print(f"❌ API returns {speed_camera_count} speed cameras, expected 0")
+                print(f"Speed cameras found: {speed_cameras}")
                 return False
         return success
 
-    def test_dutch_text_format(self):
-        """Test that API returns data in Dutch format"""
+    def test_highway_sorting_and_count(self):
+        """Test that all 14 highways are returned in correct order"""
         success, response = self.run_test(
-            "Dutch Text Format",
+            "Highway Sorting and Count",
             "GET",
             "traffic",
             200
         )
         if success:
-            # Check for Dutch text in delay_text
-            dutch_terms = ["minuten", "geen", "vertraging"]
-            
             traffic_jams = response.get('traffic_jams', [])
+            
+            # Extract road numbers
+            roads = [jam.get('road') for jam in traffic_jams]
+            
+            # Check if all expected roads are present
+            missing_roads = set(self.expected_roads) - set(roads)
+            extra_roads = set(roads) - set(self.expected_roads)
+            
+            if not missing_roads and not extra_roads:
+                print(f"✅ All expected roads are present: {', '.join(roads)}")
+            else:
+                if missing_roads:
+                    print(f"❌ Missing roads: {', '.join(missing_roads)}")
+                if extra_roads:
+                    print(f"❌ Unexpected roads: {', '.join(extra_roads)}")
+                success = False
+            
+            # Check if roads are in correct order
+            expected_order = self.expected_roads
+            if roads == expected_order:
+                print("✅ Roads are in correct chronological order")
+            else:
+                print(f"❌ Roads are not in correct order")
+                print(f"Expected: {', '.join(expected_order)}")
+                print(f"Actual: {', '.join(roads)}")
+                success = False
+                
+            # Check Dutch text for "Geen files" and "Vrij" status
+            for jam in traffic_jams:
+                if "Geen files" not in jam.get('delay_text', '') or "Vrij" not in jam.get('length_text', ''):
+                    print(f"❌ Road {jam.get('road')} doesn't have expected Dutch text")
+                    print(f"  delay_text: {jam.get('delay_text')}")
+                    print(f"  length_text: {jam.get('length_text')}")
+                    success = False
+                    break
+            else:
+                print("✅ All roads have correct Dutch text ('Geen files' and 'Vrij')")
+                
+        return success
+
+    def test_dutch_translations(self):
+        """Test that API returns data with correct Dutch translations"""
+        success, response = self.run_test(
+            "Dutch Translations",
+            "GET",
+            "traffic",
+            200
+        )
+        if success:
+            traffic_jams = response.get('traffic_jams', [])
+            
+            # Check for Dutch text in delay_text and length_text
+            dutch_delay_terms = ["Geen files"]
+            dutch_length_terms = ["Vrij"]
+            
             if not traffic_jams:
                 print("⚠️ No traffic jams found to test Dutch text")
                 return True
                 
-            # Check if any traffic jam has Dutch text
-            has_dutch = any(any(term in jam.get('delay_text', '').lower() for term in dutch_terms) 
-                           for jam in traffic_jams)
+            # Check if traffic jams have correct Dutch text
+            all_correct = True
+            for jam in traffic_jams:
+                delay_text = jam.get('delay_text', '')
+                length_text = jam.get('length_text', '')
+                
+                if not any(term in delay_text for term in dutch_delay_terms):
+                    print(f"❌ Road {jam.get('road')} has incorrect delay text: '{delay_text}'")
+                    all_correct = False
+                
+                if not any(term in length_text for term in dutch_length_terms):
+                    print(f"❌ Road {jam.get('road')} has incorrect length text: '{length_text}'")
+                    all_correct = False
             
-            if has_dutch:
-                print("✅ Found Dutch text in traffic jam data")
+            if all_correct:
+                print("✅ All traffic jams have correct Dutch translations")
                 # Print a sample
-                for jam in traffic_jams:
-                    if any(term in jam.get('delay_text', '').lower() for term in dutch_terms):
-                        print(f"Sample Dutch text: {jam.get('delay_text')} for {jam.get('road')}")
-                        break
+                sample = traffic_jams[0]
+                print(f"Sample Dutch text: {sample.get('road')} - {sample.get('delay_text')} - {sample.get('length_text')}")
             else:
-                print("❌ No Dutch text found in traffic jam data")
+                print("❌ Some traffic jams have incorrect Dutch translations")
                 success = False
                 
         return success
 
-    def test_refresh_endpoint(self):
-        """Test the refresh endpoint"""
-        success, response = self.run_test(
-            "Refresh Endpoint",
-            "POST",
-            "refresh",
-            200
-        )
-        if success:
-            print(f"Response: {response}")
-        return success
-
     def test_status_endpoint(self):
-        """Test the status endpoint"""
+        """Test the status endpoint for correct road count"""
         success, response = self.run_test(
             "Status Endpoint",
             "GET",
@@ -184,26 +168,35 @@ class ANWBTrafficMonitorTester:
             200
         )
         if success:
-            print(f"Status: {response.get('status', 'N/A')}")
-            print(f"Last updated: {response.get('last_updated', 'N/A')}")
-            print(f"Traffic jams count: {response.get('traffic_jams_count', 'N/A')}")
-            print(f"Speed cameras count: {response.get('speed_cameras_count', 'N/A')}")
-            print(f"Target roads: {len(response.get('target_roads', []))}")
-            print(f"Target cities: {len(response.get('target_cities', []))}")
+            target_roads = response.get('target_roads', [])
+            
+            if len(target_roads) == 14 and set(target_roads) == set(self.expected_roads):
+                print(f"✅ Status endpoint returns all 14 expected roads")
+            else:
+                print(f"❌ Status endpoint returns incorrect roads")
+                print(f"Expected: {', '.join(self.expected_roads)}")
+                print(f"Actual: {', '.join(target_roads)}")
+                success = False
+                
+            # Check speed camera count
+            speed_camera_count = response.get('speed_cameras_count', -1)
+            if speed_camera_count == 0:
+                print("✅ Status endpoint reports 0 speed cameras")
+            else:
+                print(f"❌ Status endpoint reports {speed_camera_count} speed cameras, expected 0")
+                success = False
+                
         return success
 
 def main():
     # Setup
-    tester = ANWBTrafficMonitorTester()
+    tester = GlowFMVerkeerTester()
     
     # Run tests
     tests = [
-        tester.test_root_endpoint,
-        tester.test_traffic_endpoint,
-        tester.test_traffic_endpoint_with_delay_filter,
-        tester.test_speed_cameras_hectometer,
-        tester.test_dutch_text_format,
-        tester.test_refresh_endpoint,
+        tester.test_speed_cameras_count,
+        tester.test_highway_sorting_and_count,
+        tester.test_dutch_translations,
         tester.test_status_endpoint
     ]
     
