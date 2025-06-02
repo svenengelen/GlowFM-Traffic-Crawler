@@ -240,12 +240,84 @@ class ANWBScraper:
         return traffic_jams
 
     def _extract_traffic_jams_detailed(self) -> List[Dict]:
-        """Extract detailed traffic jam information from the page"""
+        """Extract detailed traffic jam data by expanding accordions"""
         traffic_jams = []
         
-        # TODO: Implement detailed traffic jam extraction using Selenium
-        # This should extract more detailed information than the legacy method
+        try:
+            # Find all road articles
+            road_articles = self.driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
+            print(f"Found {len(road_articles)} road articles")
+            
+            for article in road_articles:
+                try:
+                    # Get road number
+                    road = article.get_attribute('data-accordion-road')
+                    if not road or road not in MONITORED_ROADS:
+                        print(f"Skipping road {road} - not in monitored roads")
+                        continue
+                    
+                    print(f"Processing road: {road}")
+                    
+                    # Check if there are traffic jams (look for the totals indicator)
+                    try:
+                        total_indicator = article.find_element(By.CSS_SELECTOR, "[data-test-id='traffic-list-road-totals']")
+                        total_text = total_indicator.text.strip()
+                        if not total_text or total_text == "0":
+                            print(f"No traffic jams found for {road}")
+                            continue
+                    except:
+                        print(f"No total indicator found for {road}")
+                        continue
+                    
+                    # Click to expand the accordion
+                    try:
+                        button = article.find_element(By.CSS_SELECTOR, "button[data-test-id='traffic-list-road-header']")
+                        self.driver.execute_script("arguments[0].click();", button)
+                        print(f"Expanded accordion for {road}")
+                        
+                        # Wait for content to load
+                        time.sleep(2)
+                        
+                        # Extract individual traffic jam items
+                        try:
+                            jam_items = article.find_elements(By.CSS_SELECTOR, "div[data-test-id*='traffic-item'], li[data-test-id*='traffic-item'], .traffic-item")
+                            
+                            if not jam_items:
+                                # Try alternative selectors for traffic items
+                                jam_items = article.find_elements(By.CSS_SELECTOR, "div[class*='traffic'], li[class*='jam'], .file-item")
+                            
+                            print(f"Found {len(jam_items)} traffic items for {road}")
+                            
+                            if jam_items:
+                                for idx, item in enumerate(jam_items):
+                                    jam_data = self._extract_jam_details(item, road, idx)
+                                    if jam_data:
+                                        traffic_jams.append(jam_data)
+                            else:
+                                # If no specific items found, extract from the whole accordion content
+                                jam_data = self._extract_jam_from_accordion(article, road)
+                                if jam_data:
+                                    traffic_jams.append(jam_data)
+                                    
+                        except Exception as e:
+                            print(f"Error extracting traffic items for {road}: {e}")
+                            # Fallback: extract from whole accordion
+                            jam_data = self._extract_jam_from_accordion(article, road)
+                            if jam_data:
+                                traffic_jams.append(jam_data)
+                        
+                    except Exception as e:
+                        print(f"Error expanding accordion for {road}: {e}")
+                        continue
+                        
+                except Exception as e:
+                    print(f"Error processing article: {e}")
+                    continue
+            
+        except Exception as e:
+            print(f"Error in _extract_traffic_jams_detailed: {e}")
         
+        print(f"Total detailed traffic jams extracted: {len(traffic_jams)}")
         return traffic_jams
 
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
