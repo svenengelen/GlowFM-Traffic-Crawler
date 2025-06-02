@@ -239,6 +239,15 @@ class ANWBScraper:
         print(f"Total traffic jams extracted: {len(traffic_jams)}")
         return traffic_jams
 
+    def _extract_traffic_jams_detailed(self) -> List[Dict]:
+        """Extract detailed traffic jam information from the page"""
+        traffic_jams = []
+        
+        # TODO: Implement detailed traffic jam extraction using Selenium
+        # This should extract more detailed information than the legacy method
+        
+        return traffic_jams
+
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
