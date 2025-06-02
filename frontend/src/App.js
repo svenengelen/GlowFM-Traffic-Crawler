@@ -90,6 +90,15 @@ function App() {
     return 'text-green-600 bg-green-50';
   };
 
+  const getRoadStyle = (road) => {
+    if (road.startsWith('A')) {
+      return 'bg-red-600 text-white';
+    } else if (road.startsWith('N')) {
+      return 'bg-yellow-400 text-black';
+    }
+    return 'bg-blue-100 text-blue-800'; // fallback
+  };
+
   useEffect(() => {
     fetchTrafficData();
   }, [minDelay]);
