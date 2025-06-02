@@ -587,7 +587,9 @@ def main():
         tester.test_speed_cameras_endpoint,
         tester.test_speed_cameras_in_traffic_endpoint,
         tester.test_speed_camera_data_structure,
-        tester.test_speed_camera_filtering
+        tester.test_speed_camera_filtering,
+        # Scraper test
+        tester.test_scraper_refresh  # Added scraper refresh test
     ]
     
     for test in tests:
