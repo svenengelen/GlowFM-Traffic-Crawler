@@ -361,24 +361,32 @@ function App() {
                             </span>
                           </div>
 
-                          {/* Direction */}
+                          {/* Direction and Locations */}
                           {jam.direction && jam.direction !== 'Onbekende richting' && (
                             <p className="text-sm text-blue-600 font-medium mb-1">
                               📍 {jam.direction}
                             </p>
                           )}
 
-                          {/* Location/Route */}
-                          {(jam.from_exit && jam.to_exit && jam.from_exit !== 'Onbekend') && (
+                          {/* Route Details */}
+                          {jam.route_details && jam.route_details !== 'Route onbekend' && (
                             <p className="text-sm text-gray-700 mb-1">
-                              🛣️ Van {jam.from_exit} naar {jam.to_exit}
+                              🛣️ {jam.route_details}
                             </p>
                           )}
 
-                          {/* Cause */}
-                          {jam.cause && jam.cause !== 'Onbekende oorzaak' && (
-                            <p className="text-sm text-orange-600 mb-1">
-                              ⚠️ Oorzaak: {jam.cause}
+                          {/* Source and Destination */}
+                          {(jam.source_location && jam.destination_location && 
+                            jam.source_location !== 'Onbekend' && jam.destination_location !== 'Onbekend') && (
+                            <p className="text-sm text-gray-600 mb-1">
+                              📍 Van {jam.source_location} naar {jam.destination_location}
+                            </p>
+                          )}
+
+                          {/* Detailed Cause */}
+                          {jam.cause && jam.cause !== 'Oorzaak onbekend' && (
+                            <p className="text-sm text-orange-600 mb-1 italic">
+                              ⚠️ {jam.cause}
                             </p>
                           )}
                         </div>
