@@ -129,6 +129,40 @@ class ANWBTrafficTester:
                 print("ℹ️ No A67 traffic jams found - this is acceptable as traffic conditions change")
                 return True
         return success
+        
+    def test_a270_traffic_jam(self):
+        """Test that there is at least one A270 traffic jam with expected data, or verify no traffic jams"""
+        success, response = self.run_test(
+            "A270 Traffic Jam",
+            "GET",
+            "traffic",
+            200,
+            params={"road": "A270"}
+        )
+        if success:
+            traffic_jams = response.get('traffic_jams', [])
+            if traffic_jams:
+                a270_jam = traffic_jams[0]
+                print(f"✅ Found A270 traffic jam: {a270_jam}")
+                
+                # Check for expected delay and length
+                if a270_jam.get('delay_minutes') >= 1:
+                    print(f"✅ A270 jam has expected delay: {a270_jam.get('delay_minutes')} minutes")
+                else:
+                    print(f"❌ A270 jam has unexpected delay: {a270_jam.get('delay_minutes')} minutes, expected at least 1 minute")
+                    return False
+                
+                if a270_jam.get('length_km') >= 1:
+                    print(f"✅ A270 jam has expected length: {a270_jam.get('length_km')} km")
+                else:
+                    print(f"❌ A270 jam has unexpected length: {a270_jam.get('length_km')} km, expected at least 1 km")
+                    return False
+                
+                return True
+            else:
+                print("❌ No A270 traffic jams found - this is a problem as A270 currently has a traffic jam")
+                return False
+        return success
 
     def test_roads_endpoint(self):
         """Test the roads endpoint returns the expected list of roads"""
