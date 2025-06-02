@@ -58,8 +58,8 @@ class SpeedCamera(BaseModel):
     road: str
     location: str
     direction: str
-    camera_type: str
-    speed_limit: int
+    flitser_type: str  # Dynamic flitser type
+    is_active: bool
     last_updated: datetime
 
 class TrafficData(BaseModel):
