@@ -509,19 +509,19 @@ function App() {
                             </p>
                           )}
 
-                          {/* Camera Type Details */}
+                          {/* Flitser Type Details */}
                           <div className="flex items-center space-x-4 mt-2">
-                            {camera.camera_type === 'Vaste flitser' && (
-                              <span className="text-xs text-gray-500">📷 Vaste snelheidscontrole</span>
+                            {camera.flitser_type === 'Mobiele flitser' && (
+                              <span className="text-xs text-gray-500">🚐 Mobiele snelheidscontrole</span>
                             )}
-                            {camera.camera_type === 'Trajectcontrole' && (
-                              <span className="text-xs text-gray-500">🛣️ Gemiddelde snelheid over traject</span>
+                            {camera.flitser_type === 'Actieve flitser' && (
+                              <span className="text-xs text-gray-500">📷 Actieve flitspaal</span>
                             )}
-                            {camera.camera_type === 'Mobiele flitser' && (
-                              <span className="text-xs text-gray-500">🚐 Tijdelijke/mobiele controle</span>
+                            {camera.flitser_type === 'Snelheidscontrole' && (
+                              <span className="text-xs text-gray-500">🚨 Dynamische snelheidscontrole</span>
                             )}
-                            {camera.camera_type === 'Roodlichtcamera' && (
-                              <span className="text-xs text-gray-500">🚦 Roodlicht controle</span>
+                            {camera.is_active && (
+                              <span className="text-xs text-green-600 font-medium">🟢 Momenteel actief</span>
                             )}
                           </div>
                         </div>
