@@ -75,32 +75,31 @@ class ANWBScraper:
         self.driver = None
         
     def _setup_driver(self):
-        """Set up Selenium WebDriver with Chrome"""
+        """Set up Selenium WebDriver with Chromium"""
         chrome_options = Options()
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-plugins")
+        chrome_options.add_argument("--disable-images")
+        chrome_options.add_argument("--disable-javascript")
         chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         
         # Use system Chromium
         chrome_options.binary_location = "/usr/bin/chromium"
         
-        # Initialize the driver
-        service = Service("/usr/bin/chromedriver") if os.path.exists("/usr/bin/chromedriver") else None
+        # Use system chromedriver
+        service = Service("/usr/bin/chromedriver")
         
         try:
-            if service:
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            else:
-                # Try with webdriver-manager
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            print("Successfully initialized Chrome driver")
         except Exception as e:
             print(f"Error setting up Chrome driver: {e}")
-            # Fallback to system chromium
-            self.driver = webdriver.Chrome(options=chrome_options)
+            raise e
 
     def scrape_traffic_data(self) -> Dict:
         """Scrape traffic data from ANWB website using Selenium"""
