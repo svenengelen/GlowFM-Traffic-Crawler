@@ -1,15 +1,22 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import uuid
-from datetime import datetime
-
+from datetime import datetime, timedelta
+import requests
+from bs4 import BeautifulSoup
+import re
+import schedule
+import time
+from threading import Thread
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,42 +26,282 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# Create the main app
+app = FastAPI(title="ANWB Traffic Monitor", description="Traffic and speed camera monitoring system")
 
-# Create a router with the /api prefix
+# Create API router
 api_router = APIRouter(prefix="/api")
 
-
 # Define Models
-class StatusCheck(BaseModel):
+class TrafficJam(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
+    road: str
+    location: str
+    direction: Optional[str] = None
+    delay_minutes: Optional[int] = None
+    delay_text: str
+    length_km: Optional[float] = None
+    length_text: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+class SpeedCamera(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    road: str
+    location: str
+    direction: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-# Add your routes to the router instead of directly to app
+class TrafficResponse(BaseModel):
+    traffic_jams: List[TrafficJam]
+    speed_cameras: List[SpeedCamera]
+    last_updated: datetime
+    total_jams: int
+    filtered_jams: int
+
+# Configuration
+TARGET_ROADS = ["A2", "A16", "A50", "A58", "A59", "A65", "A67", "A73", "A76", "A270", "N2", "N69", "N266", "N270"]
+TARGET_CITIES = [
+    "Eindhoven", "Venlo", "Weert", "'s-Hertogenbosch", "Roermond", "Maasbracht",
+    "Nijmegen", "Oss", "Zonzeel", "Breda", "Tilburg", "Rotterdam", "Deurne",
+    "Helmond", "Venray", "Heerlen", "Maastricht", "Belgische Grens", "Duitse Grens", 
+    "Valkenswaard"
+]
+
+class ANWBScraper:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        
+    def parse_delay(self, delay_text: str) -> int:
+        """Extract delay in minutes from delay text"""
+        if not delay_text or delay_text.strip() == "":
+            return 0
+        
+        # Extract number from text like "+ 12 min" or "12 minuten"
+        match = re.search(r'(\d+)', delay_text)
+        if match:
+            return int(match.group(1))
+        return 0
+    
+    def parse_length(self, length_text: str) -> float:
+        """Extract length in km from length text"""
+        if not length_text or length_text.strip() == "":
+            return 0.0
+            
+        # Extract number from text like "4 km"
+        match = re.search(r'(\d+(?:\.\d+)?)', length_text)
+        if match:
+            return float(match.group(1))
+        return 0.0
+    
+    def city_matches_target(self, location: str) -> bool:
+        """Check if location contains any of our target cities"""
+        if not location:
+            return False
+            
+        location_lower = location.lower()
+        for city in TARGET_CITIES:
+            if city.lower() in location_lower:
+                return True
+        return False
+    
+    async def scrape_traffic_data(self):
+        """Scrape traffic data from ANWB"""
+        try:
+            # Add delay to be respectful
+            time.sleep(2)
+            
+            response = self.session.get("https://anwb.nl/verkeer/filelijst", timeout=30)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            traffic_jams = []
+            speed_cameras = []
+            
+            # Find all road sections
+            road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
+            
+            for article in road_articles:
+                road_number_elem = article.find('span', {'data-test-id': 'traffic-list-road-road-number'})
+                if not road_number_elem:
+                    continue
+                    
+                road = road_number_elem.get_text(strip=True)
+                
+                # Only process roads we're interested in
+                if road not in TARGET_ROADS:
+                    continue
+                
+                # Get location information
+                location_elem = article.find('h3')
+                location = ""
+                if location_elem:
+                    location = location_elem.get_text(strip=True)
+                    # Remove arrow symbols
+                    location = re.sub(r'[→←↑↓]', ' - ', location)
+                
+                # Only process if location contains target cities
+                if not self.city_matches_target(location):
+                    continue
+                
+                # Get delay and length information
+                delay_elem = article.find('div', {'data-test': 'body-text'})
+                delay_text = ""
+                length_text = ""
+                
+                if delay_elem:
+                    spans = delay_elem.find_all('span')
+                    if len(spans) >= 2:
+                        delay_text = spans[0].get_text(strip=True)
+                        length_text = spans[1].get_text(strip=True)
+                    elif len(spans) == 1:
+                        text = spans[0].get_text(strip=True)
+                        if 'min' in text:
+                            delay_text = text
+                        elif 'km' in text:
+                            length_text = text
+                
+                # Create traffic jam entry
+                if delay_text or length_text:
+                    traffic_jam = TrafficJam(
+                        road=road,
+                        location=location,
+                        delay_minutes=self.parse_delay(delay_text),
+                        delay_text=delay_text,
+                        length_km=self.parse_length(length_text),
+                        length_text=length_text
+                    )
+                    traffic_jams.append(traffic_jam)
+            
+            # Store in database
+            if traffic_jams:
+                # Clear old data (keep only current)
+                await db.traffic_jams.delete_many({})
+                await db.traffic_jams.insert_many([jam.dict() for jam in traffic_jams])
+            
+            if speed_cameras:
+                await db.speed_cameras.delete_many({})
+                await db.speed_cameras.insert_many([cam.dict() for cam in speed_cameras])
+            
+            # Update last scrape time
+            await db.scrape_status.replace_one(
+                {"type": "last_update"},
+                {"type": "last_update", "timestamp": datetime.utcnow()},
+                upsert=True
+            )
+            
+            logger.info(f"Scraped {len(traffic_jams)} traffic jams and {len(speed_cameras)} speed cameras")
+            
+        except Exception as e:
+            logger.error(f"Error scraping ANWB data: {str(e)}")
+            raise
+
+# Initialize scraper
+scraper = ANWBScraper()
+
+# API Endpoints
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "ANWB Traffic Monitor API", "status": "active"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
+@api_router.get("/traffic", response_model=TrafficResponse)
+async def get_traffic_data(
+    roads: Optional[str] = Query(None, description="Comma-separated list of roads to filter"),
+    cities: Optional[str] = Query(None, description="Comma-separated list of cities to filter"),
+    min_delay: Optional[int] = Query(None, description="Minimum delay in minutes")
+):
+    """Get filtered traffic data"""
+    try:
+        # Get traffic jams
+        query = {}
+        traffic_jams_cursor = db.traffic_jams.find(query)
+        traffic_jams_data = await traffic_jams_cursor.to_list(1000)
+        traffic_jams = [TrafficJam(**jam) for jam in traffic_jams_data]
+        
+        # Get speed cameras
+        speed_cameras_cursor = db.speed_cameras.find({})
+        speed_cameras_data = await speed_cameras_cursor.to_list(1000)
+        speed_cameras = [SpeedCamera(**cam) for cam in speed_cameras_data]
+        
+        # Apply filters
+        filtered_jams = traffic_jams
+        
+        if roads:
+            road_list = [r.strip().upper() for r in roads.split(',')]
+            filtered_jams = [jam for jam in filtered_jams if jam.road.upper() in road_list]
+        
+        if cities:
+            city_list = [c.strip().lower() for c in cities.split(',')]
+            filtered_jams = [jam for jam in filtered_jams if any(city in jam.location.lower() for city in city_list)]
+        
+        if min_delay is not None:
+            filtered_jams = [jam for jam in filtered_jams if jam.delay_minutes and jam.delay_minutes >= min_delay]
+        
+        # Apply same filters to speed cameras
+        filtered_cameras = speed_cameras
+        if roads:
+            road_list = [r.strip().upper() for r in roads.split(',')]
+            filtered_cameras = [cam for cam in filtered_cameras if cam.road.upper() in road_list]
+        
+        if cities:
+            city_list = [c.strip().lower() for c in cities.split(',')]
+            filtered_cameras = [cam for cam in filtered_cameras if any(city in cam.location.lower() for city in city_list)]
+        
+        # Get last update time
+        last_update_doc = await db.scrape_status.find_one({"type": "last_update"})
+        last_updated = last_update_doc["timestamp"] if last_update_doc else datetime.utcnow()
+        
+        return TrafficResponse(
+            traffic_jams=filtered_jams,
+            speed_cameras=filtered_cameras,
+            last_updated=last_updated,
+            total_jams=len(traffic_jams),
+            filtered_jams=len(filtered_jams)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting traffic data: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error retrieving traffic data")
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+@api_router.post("/refresh")
+async def refresh_data():
+    """Manually refresh traffic data"""
+    try:
+        await scraper.scrape_traffic_data()
+        return {"message": "Data refreshed successfully", "timestamp": datetime.utcnow()}
+    except Exception as e:
+        logger.error(f"Error refreshing data: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error refreshing data")
 
-# Include the router in the main app
+@api_router.get("/status")
+async def get_status():
+    """Get system status"""
+    try:
+        last_update_doc = await db.scrape_status.find_one({"type": "last_update"})
+        last_updated = last_update_doc["timestamp"] if last_update_doc else None
+        
+        traffic_count = await db.traffic_jams.count_documents({})
+        camera_count = await db.speed_cameras.count_documents({})
+        
+        return {
+            "status": "active",
+            "last_updated": last_updated,
+            "traffic_jams_count": traffic_count,
+            "speed_cameras_count": camera_count,
+            "target_roads": TARGET_ROADS,
+            "target_cities": TARGET_CITIES
+        }
+    except Exception as e:
+        logger.error(f"Error getting status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error getting status")
+
+# Include router in app
 app.include_router(api_router)
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -69,6 +316,29 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Background task for periodic scraping
+def run_scheduler():
+    """Run the scheduler in a separate thread"""
+    schedule.every(5).minutes.do(lambda: asyncio.create_task(scraper.scrape_traffic_data()))
+    
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+# Start background scraper on startup
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting ANWB Traffic Monitor")
+    # Initial data scrape
+    try:
+        await scraper.scrape_traffic_data()
+    except Exception as e:
+        logger.error(f"Initial scraping failed: {str(e)}")
+    
+    # Start background scheduler
+    scheduler_thread = Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
