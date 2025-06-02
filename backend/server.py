@@ -228,17 +228,20 @@ class ANWBScraper:
                 
                 # Add sample speed cameras for monitoring
                 camera_data = [
-                    {"road": "A2", "location": "Eindhoven Zuid"},
-                    {"road": "A50", "location": "'s-Hertogenbosch Noord"},
-                    {"road": "A73", "location": "Venlo Centrum"},
-                    {"road": "A58", "location": "Breda Oost"},
-                    {"road": "N69", "location": "Valkenswaard"}
+                    {"road": "A2", "location": "Eindhoven Zuid", "hectometer": "124.8"},
+                    {"road": "A50", "location": "'s-Hertogenbosch Noord", "hectometer": "89.2"},
+                    {"road": "A73", "location": "Venlo Centrum", "hectometer": "67.5"},
+                    {"road": "A58", "location": "Breda Oost", "hectometer": "103.1"},
+                    {"road": "N69", "location": "Valkenswaard", "hectometer": "15.7"},
+                    {"road": "A16", "location": "Rotterdam Zuid", "hectometer": "45.3"},
+                    {"road": "A67", "location": "Eindhoven Noord", "hectometer": "78.9"}
                 ]
                 
                 for data in camera_data:
                     camera = SpeedCamera(
                         road=data["road"],
-                        location=data["location"]
+                        location=data["location"],
+                        hectometer=data["hectometer"]
                     )
                     speed_cameras.append(camera)
             
