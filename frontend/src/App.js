@@ -18,7 +18,7 @@ function App() {
     "Eindhoven", "Venlo", "Weert", "'s-Hertogenbosch", "Roermond", "Maasbracht",
     "Nijmegen", "Oss", "Zonzeel", "Breda", "Tilburg", "Rotterdam", "Deurne",
     "Helmond", "Venray", "Heerlen", "Maastricht", "Belgische Grens", "Duitse Grens", 
-    "Valkenswaard"
+    "Valkenswaard", "Zevenbergschen Hoek", "Moerdijkbrug", "Culemborg"
   ];
 
   const DELAY_OPTIONS = [
