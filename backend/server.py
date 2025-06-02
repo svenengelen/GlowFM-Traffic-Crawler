@@ -504,6 +504,141 @@ class ANWBScraper:
         
         return "Onbekende oorzaak"
 
+    def _extract_detailed_direction_and_locations(self, text: str, direction_elements: list) -> tuple:
+        """Extract detailed direction with source and destination locations"""
+        direction = "Onbekende richting"
+        source_location = "Onbekend"
+        destination_location = "Onbekend"
+        
+        try:
+            # First, try to extract from HTML elements if available
+            for element in direction_elements:
+                element_text = element.text.strip()
+                if element_text and len(element_text) > 3:
+                    # Look for direction patterns
+                    if 'richting' in element_text.lower():
+                        direction = element_text
+                        # Extract destination from direction
+                        match = re.search(r'richting\s+([^→\n,]+)', element_text)
+                        if match:
+                            destination_location = match.group(1).strip()
+                    break
+            
+            # Fallback to text-based extraction
+            if direction == "Onbekende richting":
+                text_lower = text.lower()
+                
+                # Look for "van X richting Y" or "richting Y vanaf X" patterns
+                patterns = [
+                    r'van\s+([^→\n,]+?)\s+richting\s+([^→\n,]+)',
+                    r'richting\s+([^→\n,]+?)\s+vanaf\s+([^→\n,]+)',
+                    r'([^→\n,]+?)\s*→\s*([^→\n,]+)',
+                    r'vanaf\s+([^→\n,]+?)\s+naar\s+([^→\n,]+)'
+                ]
+                
+                for pattern in patterns:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        if 'van' in pattern or 'vanaf' in pattern:
+                            source_location = match.group(1).strip()
+                            destination_location = match.group(2).strip()
+                        else:
+                            destination_location = match.group(1).strip()
+                            source_location = match.group(2).strip()
+                        direction = f"van {source_location} richting {destination_location}"
+                        break
+                
+                # If still no direction found, look for simple "richting X"
+                if direction == "Onbekende richting":
+                    match = re.search(r'richting\s+([^→\n,]+)', text_lower)
+                    if match:
+                        destination_location = match.group(1).strip()
+                        direction = f"richting {destination_location}"
+                
+                # Look for major cities that indicate direction
+                direction_cities = ['eindhoven', 'venlo', 'utrecht', 'amsterdam', 'rotterdam', 'breda', 'tilburg', 'nijmegen', 'maastricht', "'s-hertogenbosch"]
+                for city in direction_cities:
+                    if city in text_lower and destination_location == "Onbekend":
+                        destination_location = city.title()
+                        direction = f"richting {destination_location}"
+                        break
+                        
+        except Exception as e:
+            print(f"Error extracting detailed direction: {e}")
+        
+        return direction, source_location, destination_location
+
+    def _extract_route_details(self, text: str, route_elements: list) -> str:
+        """Extract route details like 'afrit panningen - venlo-noordwest'"""
+        try:
+            # First, try to extract from HTML elements
+            for element in route_elements:
+                element_text = element.text.strip()
+                if element_text and ('afrit' in element_text.lower() or 'knooppunt' in element_text.lower() or '-' in element_text):
+                    return element_text
+            
+            # Fallback to text-based extraction
+            lines = text.split('\n')
+            for line in lines:
+                line_clean = line.strip()
+                if line_clean and any(keyword in line_clean.lower() for keyword in ['afrit', 'knooppunt', 'knp']):
+                    # Clean up the line
+                    route_details = re.sub(r'^(afrit|knooppunt|knp)\s*', '', line_clean, flags=re.IGNORECASE).strip()
+                    if route_details:
+                        return f"afrit {route_details}" if 'afrit' not in route_details.lower() else route_details
+            
+            # Look for patterns with dashes or arrows that might indicate route details
+            route_pattern = re.search(r'([a-zA-Z][^→\n]*?-[^→\n]*?[a-zA-Z])', text)
+            if route_pattern:
+                return route_pattern.group(1).strip()
+                
+        except Exception as e:
+            print(f"Error extracting route details: {e}")
+        
+        return "Route onbekend"
+
+    def _extract_detailed_cause(self, text: str, cause_elements: list) -> str:
+        """Extract detailed cause from cursive/italic text"""
+        try:
+            # First, try to extract from HTML elements (em, i, italic styles)
+            for element in cause_elements:
+                element_text = element.text.strip()
+                if element_text and len(element_text) > 5:
+                    return element_text
+            
+            # Fallback to text-based extraction
+            lines = text.split('\n')
+            for line in lines:
+                line_clean = line.strip()
+                
+                # Look for specific Dutch traffic cause phrases
+                if any(phrase in line_clean.lower() for phrase in [
+                    'langzaam rijdend verkeer',
+                    'file door',
+                    'wegwerkzaamheden',
+                    'ongeval',
+                    'pech',
+                    'defect voertuig',
+                    'spitsfile',
+                    'weersomstandigheden',
+                    'gladheid',
+                    'zeer druk'
+                ]):
+                    return line_clean
+            
+            # Look for any descriptive text that might be a cause
+            for line in lines:
+                line_clean = line.strip()
+                if (len(line_clean) > 10 and 
+                    not any(skip in line_clean.lower() for skip in ['min', 'km', 'richting', '→', 'afrit', 'knooppunt']) and
+                    any(char.isalpha() for char in line_clean)):
+                    return line_clean[:100]  # Limit length
+                    
+        except Exception as e:
+            print(f"Error extracting detailed cause: {e}")
+        
+        return "Oorzaak onbekend"
+
     def _extract_speed_cameras_detailed(self) -> List[Dict]:
         """Extract speed camera data by enabling the Flitsers checkbox"""
         speed_cameras = []
