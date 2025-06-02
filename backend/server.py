@@ -56,6 +56,9 @@ class SpeedCamera(BaseModel):
     id: str
     road: str
     location: str
+    direction: str
+    camera_type: str
+    speed_limit: int
     last_updated: datetime
 
 class TrafficData(BaseModel):
