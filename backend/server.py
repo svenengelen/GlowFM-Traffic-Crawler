@@ -81,7 +81,24 @@ class ANWBScraper:
             response = self.session.get(self.base_url, timeout=30)
             response.raise_for_status()
             
+            # Save HTML for debugging
+            with open('/tmp/anwb_debug.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            print(f"Saved HTML to /tmp/anwb_debug.html, size: {len(response.text)} chars")
+            
             soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Debug: try to find any articles at all
+            all_articles = soup.find_all('article')
+            print(f"Found {len(all_articles)} total articles")
+            
+            # Debug: try to find any divs with traffic-related classes
+            traffic_divs = soup.find_all('div', class_=lambda x: x and 'traffic' in x.lower())
+            print(f"Found {len(traffic_divs)} divs with 'traffic' in class name")
+            
+            # Debug: try to find any elements with road numbers
+            road_mentions = soup.find_all(text=lambda text: text and any(road in text for road in ['A2', 'A16', 'A50', 'A67']))
+            print(f"Found {len(road_mentions)} mentions of road numbers")
             
             # Extract traffic jams
             traffic_jams = self._extract_traffic_jams(soup)
