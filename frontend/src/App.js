@@ -258,7 +258,7 @@ function App() {
               <div className="divide-y divide-gray-200">
                 {trafficData.speed_cameras.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
-                    Geen flitsers gevonden met de huidige filters
+                    Geen flitsers, door naar de hits!
                   </div>
                 ) : (
                   trafficData.speed_cameras.map((camera, index) => (
