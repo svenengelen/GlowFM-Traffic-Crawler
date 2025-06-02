@@ -343,7 +343,7 @@ class ANWBScraper:
         return traffic_jams
 
     def _extract_flitsers_fast(self, driver) -> List[Dict]:
-        """Fast flitser extraction focused on finding active flitsers"""
+        """Fast flitser extraction focused on finding active flitsers with detailed info"""
         speed_cameras = []
         
         try:
@@ -359,7 +359,7 @@ class ANWBScraper:
                         # Try to click the toggle
                         driver.execute_script("arguments[0].click();", toggle)
                         print(f"Clicked potential flitser toggle: {toggle.text[:30]}")
-                        time.sleep(1)
+                        time.sleep(2)  # Wait a bit longer for flitser data to load
                         break
                     except:
                         continue
@@ -367,107 +367,233 @@ class ANWBScraper:
             except Exception as e:
                 print(f"Could not enable flitser toggle: {e}")
             
-            # Now look for flitser data in the page
+            # Wait a bit more for flitser data to appear
+            time.sleep(2)
+            
+            # Now look for flitser data with better context extraction
             try:
-                # Search for elements containing flitser information
-                flitser_selectors = [
-                    "//*[contains(text(), 'flitser')]",
-                    "//*[contains(text(), 'Flitser')]",
-                    "//*[contains(text(), 'snelheidscontrole')]",
-                    "//*[contains(text(), 'camera')]"
+                print("Searching for flitser data with full context...")
+                
+                # Try to find flitser containers or sections
+                flitser_containers = []
+                
+                # Look for various container patterns that might hold flitser information
+                container_selectors = [
+                    "//div[contains(., 'flitser') or contains(., 'Flitser')]",
+                    "//li[contains(., 'flitser') or contains(., 'Flitser')]", 
+                    "//article[contains(., 'flitser') or contains(., 'Flitser')]",
+                    "//section[contains(., 'flitser') or contains(., 'Flitser')]",
+                    "//*[@class][contains(., 'flitser') or contains(., 'Flitser')]"
                 ]
                 
-                all_flitser_elements = []
-                for selector in flitser_selectors:
+                for selector in container_selectors:
                     try:
-                        elements = driver.find_elements(By.XPATH, selector)
-                        all_flitser_elements.extend(elements)
-                    except:
+                        containers = driver.find_elements(By.XPATH, selector)
+                        if containers:
+                            print(f"Found {len(containers)} containers with selector: {selector}")
+                            flitser_containers.extend(containers)
+                    except Exception as e:
+                        print(f"Container selector failed: {e}")
                         continue
                 
-                print(f"Found {len(all_flitser_elements)} potential flitser elements")
+                print(f"Found {len(flitser_containers)} total flitser containers")
                 
-                # Process each element quickly
-                processed_texts = set()
-                for idx, element in enumerate(all_flitser_elements[:10]):  # Limit to first 10
+                # Process each container to extract detailed flitser information
+                processed_containers = set()
+                for idx, container in enumerate(flitser_containers[:20]):  # Limit processing
                     try:
-                        element_text = element.text.strip()
+                        # Get the full text content of the container
+                        container_text = container.text.strip()
                         
-                        # Skip if we've seen this text or it's too short
-                        if not element_text or len(element_text) < 5 or element_text in processed_texts:
+                        # Skip if empty, too short, or already processed
+                        if not container_text or len(container_text) < 10:
                             continue
-                        
-                        processed_texts.add(element_text)
-                        
-                        print(f"Processing flitser element {idx}: '{element_text}'")
-                        
-                        # Look for road information in the element or nearby
-                        road = self._extract_road_from_text(element_text)
-                        
-                        # If no road in element text, check parent or nearby elements
-                        if not road:
-                            try:
-                                # Check parent element
-                                parent = element.find_element(By.XPATH, "./..")
-                                parent_text = parent.text
-                                road = self._extract_road_from_text(parent_text)
-                                
-                                # Check siblings or nearby elements
-                                if not road:
-                                    siblings = parent.find_elements(By.XPATH, "./*")
-                                    for sibling in siblings[:5]:  # Check first 5 siblings
-                                        sibling_text = sibling.text
-                                        road = self._extract_road_from_text(sibling_text)
-                                        if road:
-                                            break
-                                            
-                            except:
-                                pass
-                        
-                        # If we found a monitored road, create flitser entry
-                        if road and road in MONITORED_ROADS:
-                            print(f"Found flitser on monitored road: {road}")
                             
-                            location = self._extract_camera_location(element_text)
-                            direction = f"richting onbekend"
-                            flitser_type = "Mobiele flitser"
-                            is_active = True
-                            
-                            # Try to get more details from the full context
-                            try:
-                                full_context = element.find_element(By.XPATH, "./ancestor::*[5]").text
-                                direction, _, _ = self._extract_detailed_direction_and_locations(full_context, [])
-                                flitser_type, is_active = self._extract_flitser_type_and_status(full_context)
-                            except:
-                                pass
-                            
-                            flitser_data = {
-                                'id': f"flitser_{road}_{int(time.time())}_{idx}",
-                                'road': road,
-                                'location': location,
-                                'direction': direction,
-                                'flitser_type': flitser_type,
-                                'is_active': is_active,
-                                'last_updated': datetime.now()
-                            }
-                            
+                        # Create a unique identifier for this container text
+                        container_id = hash(container_text)
+                        if container_id in processed_containers:
+                            continue
+                        processed_containers.add(container_id)
+                        
+                        print(f"Processing flitser container {idx}:")
+                        print(f"  Full text: '{container_text}'")
+                        
+                        # Extract detailed flitser information from the full context
+                        flitser_data = self._extract_detailed_flitser_info(container_text, idx)
+                        if flitser_data:
                             speed_cameras.append(flitser_data)
-                            print(f"Added flitser: {road} - {flitser_type}")
+                            print(f"  ✅ Extracted flitser: {flitser_data['road']} - {flitser_data['direction']}")
                         else:
-                            print(f"No monitored road found for element: '{element_text}' (road: {road})")
+                            print(f"  ❌ Could not extract flitser data")
                             
                     except Exception as e:
-                        print(f"Error processing flitser element {idx}: {e}")
+                        print(f"Error processing flitser container {idx}: {e}")
                         continue
                         
             except Exception as e:
-                print(f"Error searching for flitser elements: {e}")
+                print(f"Error searching for flitser containers: {e}")
                 
         except Exception as e:
             print(f"Error in fast flitser extraction: {e}")
         
         print(f"Fast flitser extraction complete: {len(speed_cameras)} flitsers found")
         return speed_cameras
+
+    def _extract_detailed_flitser_info(self, text: str, idx: int) -> Dict:
+        """Extract detailed flitser information including road, direction, and hectometer"""
+        try:
+            print(f"Analyzing flitser text: '{text}'")
+            
+            # Extract road information
+            road = self._extract_road_from_text(text)
+            if not road or road not in MONITORED_ROADS:
+                print(f"No monitored road found in text: '{text}' (extracted road: {road})")
+                return None
+            
+            print(f"Found monitored road: {road}")
+            
+            # Extract direction information
+            direction = self._extract_flitser_direction(text)
+            
+            # Extract hectometer information  
+            hectometer = self._extract_hectometer_info(text)
+            
+            # Extract location (combine hectometer and other location info)
+            location = self._extract_flitser_location(text, hectometer)
+            
+            # Determine flitser type and status
+            flitser_type, is_active = self._extract_flitser_type_and_status(text)
+            
+            # Create detailed flitser data
+            flitser_data = {
+                'id': f"flitser_{road}_{int(time.time())}_{idx}",
+                'road': road,
+                'location': location,
+                'direction': direction,
+                'hectometer': hectometer,
+                'flitser_type': flitser_type,
+                'is_active': is_active,
+                'last_updated': datetime.now()
+            }
+            
+            print(f"Created detailed flitser: {flitser_data}")
+            return flitser_data
+            
+        except Exception as e:
+            print(f"Error extracting detailed flitser info: {e}")
+            return None
+
+    def _extract_flitser_direction(self, text: str) -> str:
+        """Extract direction information from flitser text"""
+        try:
+            text_lower = text.lower()
+            
+            # Look for direction patterns specific to flitsers
+            direction_patterns = [
+                r'richting\s+([^→\n,\.]+)',
+                r'naar\s+([^→\n,\.]+)',
+                r'→\s*([^→\n,\.]+)',
+                r'in de richting van\s+([^→\n,\.]+)'
+            ]
+            
+            for pattern in direction_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    direction = match.group(1).strip()
+                    return f"richting {direction}"
+            
+            # Look for major cities in the text that indicate direction
+            cities = ['eindhoven', 'venlo', 'utrecht', 'amsterdam', 'rotterdam', 'breda', 'tilburg', 'nijmegen', 'maastricht', "'s-hertogenbosch", 'weert', 'roermond']
+            for city in cities:
+                if city in text_lower:
+                    return f"richting {city.title()}"
+            
+            return "Richting onbekend"
+            
+        except Exception as e:
+            print(f"Error extracting flitser direction: {e}")
+            return "Richting onbekend"
+
+    def _extract_hectometer_info(self, text: str) -> str:
+        """Extract hectometer pole information from flitser text"""
+        try:
+            # Look for hectometer patterns like "km 25.5", "hmp 123.4", "hectometerpaal 45.2"
+            hectometer_patterns = [
+                r'km\s+(\d+(?:\.\d+)?)',
+                r'hmp\s+(\d+(?:\.\d+)?)', 
+                r'hectometerpaal\s+(\d+(?:\.\d+)?)',
+                r'kilometerpaaltje\s+(\d+(?:\.\d+)?)',
+                r'(\d+(?:\.\d+)?)\s*km',
+                r'(\d+,\d+)\s*km',  # Dutch decimal notation
+                r'bij\s+km\s+(\d+(?:\.\d+)?)',
+                r'ter hoogte van\s+km\s+(\d+(?:\.\d+)?)'
+            ]
+            
+            for pattern in hectometer_patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    km_value = match.group(1).replace(',', '.')  # Convert Dutch decimal
+                    return f"km {km_value}"
+            
+            # Look for general numeric indicators that might be hectometers
+            numeric_patterns = [
+                r'(\d+\.\d+)',  # Decimal numbers
+                r'(\d+,\d+)'    # Dutch decimal notation
+            ]
+            
+            for pattern in numeric_patterns:
+                matches = re.findall(pattern, text)
+                if matches:
+                    # Take the first reasonable number (between 0 and 200 km)
+                    for match in matches:
+                        try:
+                            km_val = float(match.replace(',', '.'))
+                            if 0 <= km_val <= 200:  # Reasonable km range
+                                return f"km {km_val}"
+                        except:
+                            continue
+            
+            return "Hectometer onbekend"
+            
+        except Exception as e:
+            print(f"Error extracting hectometer info: {e}")
+            return "Hectometer onbekend"
+
+    def _extract_flitser_location(self, text: str, hectometer: str) -> str:
+        """Extract location information combining hectometer and other details"""
+        try:
+            # Start with hectometer if available
+            location_parts = []
+            
+            if hectometer and hectometer != "Hectometer onbekend":
+                location_parts.append(hectometer)
+            
+            # Look for additional location indicators
+            location_indicators = [
+                r'bij\s+([^→\n,\.]+)',
+                r'ter hoogte van\s+([^→\n,\.]+)', 
+                r'nabij\s+([^→\n,\.]+)',
+                r'tussen\s+([^→\n,\.]+)',
+                r'afrit\s+([^→\n,\.]+)'
+            ]
+            
+            for pattern in location_indicators:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    location_detail = match.group(1).strip()
+                    if location_detail not in [part for part in location_parts]:
+                        location_parts.append(location_detail)
+                    break
+            
+            # Combine location parts
+            if location_parts:
+                return " - ".join(location_parts)
+            else:
+                return "Locatie onbekend"
+                
+        except Exception as e:
+            print(f"Error extracting flitser location: {e}")
+            return "Locatie onbekend"
 
     def _extract_traffic_jams(self, soup: BeautifulSoup) -> List[Dict]:
         """Legacy extraction method - kept as backup"""
