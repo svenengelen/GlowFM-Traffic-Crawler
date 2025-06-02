@@ -14,3 +14,5 @@ fastapi-cors==0.0.6
 schedule==1.2.0
 asyncio==3.4.3
 aiohttp==3.9.1
+selenium==4.15.2
+webdriver-manager==4.0.1
