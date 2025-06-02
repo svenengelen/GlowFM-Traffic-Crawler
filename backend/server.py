@@ -134,8 +134,8 @@ class ANWBScraper:
             # Extract traffic jams by expanding each accordion
             traffic_jams = self._extract_traffic_jams_detailed()
             
-            # Extract speed cameras (placeholder for now)
-            speed_cameras = []
+            # Extract speed cameras by enabling the "Flitsers" checkbox
+            speed_cameras = self._extract_speed_cameras_detailed()
             
             return {
                 'traffic_jams': traffic_jams,
