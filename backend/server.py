@@ -112,6 +112,7 @@ class ANWBScraper:
         
         # Find all road articles
         road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
+        print(f"Found {len(road_articles)} road articles")
         
         for article in road_articles:
             try:
@@ -121,14 +122,18 @@ class ANWBScraper:
                     continue
                     
                 road = road_element.get_text(strip=True)
+                print(f"Processing road: {road}")
                 
                 # Only process monitored roads
                 if road not in MONITORED_ROADS:
+                    print(f"Road {road} not in monitored roads, skipping")
                     continue
                 
                 # Check if there's traffic data
                 delay_info = article.find('div', class_='sc-fd0a2c7e-6')
                 location_info = article.find('h3', class_='sc-fd0a2c7e-5')
+                
+                print(f"Road {road}: delay_info={delay_info.get_text(strip=True) if delay_info else 'None'}")
                 
                 if delay_info and delay_info.get_text(strip=True):
                     # Extract delay and length
@@ -136,28 +141,33 @@ class ANWBScraper:
                     delay_minutes = self._extract_delay_minutes(delay_text)
                     length_km = self._extract_length_km(delay_text)
                     
+                    print(f"Found traffic data: {delay_text}, delay={delay_minutes}min, length={length_km}km")
+                    
                     # Extract location
                     location = "Unknown"
                     if location_info:
                         location = location_info.get_text(strip=True)
                         location = re.sub(r'[→←]', ' - ', location)  # Replace arrows with dashes
                     
-                    # Check if location matches our monitored cities
-                    if self._location_matches_cities(location):
-                        traffic_jam = {
-                            'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
-                            'road': road,
-                            'location': location,
-                            'delay_minutes': delay_minutes,
-                            'length_km': length_km,
-                            'last_updated': datetime.now()
-                        }
-                        traffic_jams.append(traffic_jam)
+                    print(f"Location: {location}")
+                    
+                    # For monitored roads, add traffic jam regardless of city filter for now
+                    traffic_jam = {
+                        'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
+                        'road': road,
+                        'location': location,
+                        'delay_minutes': delay_minutes,
+                        'length_km': length_km,
+                        'last_updated': datetime.now()
+                    }
+                    traffic_jams.append(traffic_jam)
+                    print(f"Added traffic jam: {traffic_jam}")
                         
             except Exception as e:
                 print(f"Error processing road article: {str(e)}")
                 continue
         
+        print(f"Total traffic jams extracted: {len(traffic_jams)}")
         return traffic_jams
 
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
