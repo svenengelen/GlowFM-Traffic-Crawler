@@ -320,6 +320,170 @@ class ANWBScraper:
         print(f"Total detailed traffic jams extracted: {len(traffic_jams)}")
         return traffic_jams
 
+    def _extract_jam_details(self, item_element, road: str, idx: int) -> Dict:
+        """Extract details from a specific traffic jam item"""
+        try:
+            # Get all text content from the item
+            text_content = item_element.text.strip()
+            
+            if not text_content:
+                return None
+            
+            print(f"Processing traffic item {idx} for {road}: {text_content}")
+            
+            # Extract direction (looking for common Dutch direction indicators)
+            direction = self._extract_direction(text_content)
+            
+            # Extract exits/locations
+            from_exit, to_exit = self._extract_exits(text_content)
+            
+            # Extract cause
+            cause = self._extract_cause(text_content)
+            
+            # Extract delay and length
+            delay_minutes = self._extract_delay_minutes(text_content)
+            length_km = self._extract_length_km(text_content)
+            
+            if delay_minutes > 0 or length_km > 0:
+                return {
+                    'id': f"{road}_{int(time.time())}_{idx}",
+                    'road': road,
+                    'direction': direction,
+                    'from_exit': from_exit,
+                    'to_exit': to_exit,
+                    'cause': cause,
+                    'delay_minutes': delay_minutes,
+                    'length_km': length_km,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting jam details: {e}")
+        
+        return None
+
+    def _extract_jam_from_accordion(self, article_element, road: str) -> Dict:
+        """Extract jam data from the whole accordion when specific items aren't found"""
+        try:
+            # Get all text from the expanded accordion
+            text_content = article_element.text.strip()
+            
+            print(f"Extracting from whole accordion for {road}: {text_content[:200]}...")
+            
+            # Extract direction
+            direction = self._extract_direction(text_content)
+            
+            # Extract exits/locations
+            from_exit, to_exit = self._extract_exits(text_content)
+            
+            # Extract cause
+            cause = self._extract_cause(text_content)
+            
+            # Extract delay and length
+            delay_minutes = self._extract_delay_minutes(text_content)
+            length_km = self._extract_length_km(text_content)
+            
+            if delay_minutes > 0 or length_km > 0:
+                return {
+                    'id': f"{road}_{int(time.time())}_0",
+                    'road': road,
+                    'direction': direction,
+                    'from_exit': from_exit,
+                    'to_exit': to_exit,
+                    'cause': cause,
+                    'delay_minutes': delay_minutes,
+                    'length_km': length_km,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting from accordion: {e}")
+        
+        return None
+
+    def _extract_direction(self, text: str) -> str:
+        """Extract direction from traffic text"""
+        text_lower = text.lower()
+        
+        # Common direction patterns in Dutch
+        if 'richting' in text_lower:
+            # Find text after "richting"
+            match = re.search(r'richting\s+([^\n,]+)', text_lower)
+            if match:
+                return f"richting {match.group(1).strip()}"
+        
+        # Look for specific cities that indicate direction
+        direction_cities = ['eindhoven', 'venlo', 'utrecht', 'amsterdam', 'rotterdam', 'breda', 'tilburg', 'nijmegen', 'maastricht']
+        for city in direction_cities:
+            if city in text_lower:
+                return f"richting {city.title()}"
+        
+        return "Onbekende richting"
+
+    def _extract_exits(self, text: str) -> tuple:
+        """Extract from and to exits/locations"""
+        # Look for patterns like "tussen X en Y", "van X naar Y", etc.
+        patterns = [
+            r'tussen\s+([^→\n]+?)→\s*([^→\n]+)',
+            r'tussen\s+([^→\n]+)\s+→\s*([^→\n]+)',
+            r'van\s+([^→\n]+?)\s*naar\s+([^→\n]+)',
+            r'([^→\n]+?)\s*→\s*([^→\n]+)',
+            r'([^↔\n]+?)\s*↔\s*([^↔\n]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                from_exit = match.group(1).strip()
+                to_exit = match.group(2).strip()
+                return from_exit, to_exit
+        
+        # Fallback: try to find any location names
+        lines = text.split('\n')
+        for line in lines:
+            if any(keyword in line.lower() for keyword in ['afrit', 'knooppunt', 'knp', 'exit']):
+                return line.strip(), ""
+        
+        return "Onbekend", "Onbekend"
+
+    def _extract_cause(self, text: str) -> str:
+        """Extract cause of traffic jam"""
+        text_lower = text.lower()
+        
+        # Common causes in Dutch
+        causes = {
+            'ongeval': 'Ongeval',
+            'accident': 'Ongeval',
+            'werkzaamheden': 'Werkzaamheden',
+            'roadworks': 'Werkzaamheden',
+            'wegwerkzaamheden': 'Werkzaamheden',
+            'pech': 'Pech',
+            'breakdown': 'Pech',
+            'defect voertuig': 'Pech',
+            'file': 'Drukte',
+            'spits': 'Spitsfile',
+            'drukte': 'Drukte',
+            'weersomstandigheden': 'Weer',
+            'slecht weer': 'Weer',
+            'gladheid': 'Gladheid',
+            'mist': 'Mist',
+            'vorming': 'File door drukte'
+        }
+        
+        for keyword, cause in causes.items():
+            if keyword in text_lower:
+                return cause
+        
+        # If no specific cause found, try to extract any descriptive text
+        lines = text.split('\n')
+        for line in lines:
+            line_clean = line.strip()
+            if len(line_clean) > 5 and any(char.isalpha() for char in line_clean):
+                if not any(skip in line_clean.lower() for skip in ['min', 'km', 'richting', '→', 'file']):
+                    return line_clean[:50]  # Limit length
+        
+        return "Onbekende oorzaak"
+
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
