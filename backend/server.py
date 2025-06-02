@@ -110,18 +110,29 @@ class ANWBScraper:
         """Extract traffic jam data from HTML"""
         traffic_jams = []
         
-        # Find all road articles
-        road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
-        print(f"Found {len(road_articles)} road articles")
+        # Find all road articles using the correct selectors from our analysis
+        road_articles = soup.find_all('article', {'data-accordion-road': True})
+        print(f"Found {len(road_articles)} road articles with data-accordion-road")
+        
+        if not road_articles:
+            # Fallback: try alternative selectors
+            road_articles = soup.find_all('article', class_='sc-fd0a2c7e-2')
+            print(f"Fallback: Found {len(road_articles)} road articles with class sc-fd0a2c7e-2")
         
         for article in road_articles:
             try:
-                # Get road number
-                road_element = article.find('span', {'data-test-id': 'traffic-list-road-road-number'})
-                if not road_element:
+                # Get road number from data-accordion-road attribute or span element
+                road = None
+                if article.get('data-accordion-road'):
+                    road = article.get('data-accordion-road')
+                else:
+                    road_element = article.find('span', title=True)
+                    if road_element and road_element.get('title'):
+                        road = road_element.get('title')
+                
+                if not road:
                     continue
                     
-                road = road_element.get_text(strip=True)
                 print(f"Processing road: {road}")
                 
                 # Only process monitored roads
@@ -129,12 +140,17 @@ class ANWBScraper:
                     print(f"Road {road} not in monitored roads, skipping")
                     continue
                 
-                # Check if there's traffic data
+                # Look for traffic data in the specific div structure we saw in HTML
                 delay_info = article.find('div', class_='sc-fd0a2c7e-6')
                 location_info = article.find('h3', class_='sc-fd0a2c7e-5')
                 
-                print(f"Road {road}: delay_info={delay_info.get_text(strip=True) if delay_info else 'None'}")
+                # Also check for totals div that shows "2 files" etc
+                totals_info = article.find('div', {'data-test-id': 'traffic-list-road-totals'})
                 
+                print(f"Road {road}: delay_info={delay_info.get_text(strip=True) if delay_info else 'None'}")
+                print(f"Road {road}: totals_info={totals_info.get_text(strip=True) if totals_info else 'None'}")
+                
+                # Check if there's actual traffic data (delays and length)
                 if delay_info and delay_info.get_text(strip=True):
                     # Extract delay and length
                     delay_text = delay_info.get_text(strip=True)
@@ -148,21 +164,28 @@ class ANWBScraper:
                     if location_info:
                         location = location_info.get_text(strip=True)
                         location = re.sub(r'[→←]', ' - ', location)  # Replace arrows with dashes
+                        location = re.sub(r'\s+', ' ', location)  # Clean up multiple spaces
                     
                     print(f"Location: {location}")
                     
-                    # For monitored roads, add traffic jam regardless of city filter for now
-                    traffic_jam = {
-                        'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
-                        'road': road,
-                        'location': location,
-                        'delay_minutes': delay_minutes,
-                        'length_km': length_km,
-                        'last_updated': datetime.now()
-                    }
-                    traffic_jams.append(traffic_jam)
-                    print(f"Added traffic jam: {traffic_jam}")
-                        
+                    # Only add if we have meaningful delay information
+                    if delay_minutes > 0:
+                        traffic_jam = {
+                            'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
+                            'road': road,
+                            'location': location,
+                            'delay_minutes': delay_minutes,
+                            'length_km': length_km,
+                            'last_updated': datetime.now()
+                        }
+                        traffic_jams.append(traffic_jam)
+                        print(f"Added traffic jam: {traffic_jam}")
+                
+                # Also handle cases where there are traffic totals but no specific delay info (A67 case)
+                elif totals_info and not delay_info:
+                    # This means there are traffic jams but displayed differently
+                    print(f"Road {road} has traffic totals but no delay info yet")
+                    
             except Exception as e:
                 print(f"Error processing road article: {str(e)}")
                 continue
