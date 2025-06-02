@@ -16,14 +16,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    road: '',
-    city: '',
+    road: '', // Will use all roads by default
+    city: '', // Will use all cities by default
     minDelay: ''
   });
   const [monitoredRoads, setMonitoredRoads] = useState([]);
   const [monitoredCities, setMonitoredCities] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [activeTab, setActiveTab] = useState('traffic');
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
 
