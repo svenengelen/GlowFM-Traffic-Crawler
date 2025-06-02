@@ -108,35 +108,18 @@ class ANWBScraper:
             raise e
 
     def scrape_traffic_data(self) -> Dict:
-        """Scrape traffic data from ANWB website using Selenium"""
+        """Scrape traffic data from ANWB website using separate short sessions"""
         try:
-            print(f"Scraping ANWB traffic data with Selenium at {datetime.now()}")
+            print(f"Starting ANWB traffic data scraping at {datetime.now()}")
             
-            # Setup WebDriver
-            self._setup_driver()
+            # Session 1: Extract traffic jams
+            traffic_jams = self._scrape_traffic_jams_session()
             
-            # Navigate to the page
-            self.driver.get(self.base_url)
+            # Small delay between sessions
+            time.sleep(2)
             
-            # Wait for the page to load and traffic data to appear
-            print("Waiting for traffic data to load...")
-            wait = WebDriverWait(self.driver, 20)
-            
-            # Wait for traffic list to be present
-            try:
-                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "article[data-accordion-road]")))
-                print("Traffic data loaded successfully")
-            except:
-                print("Timeout waiting for traffic data, proceeding with available content")
-            
-            # Wait a bit more to ensure all content is loaded
-            time.sleep(3)
-            
-            # Extract traffic jams by expanding each accordion
-            traffic_jams = self._extract_traffic_jams_detailed()
-            
-            # Extract speed cameras by enabling the "Flitsers" checkbox
-            speed_cameras = self._extract_speed_cameras_detailed()
+            # Session 2: Extract flitsers
+            speed_cameras = self._scrape_flitsers_session()
             
             return {
                 'traffic_jams': traffic_jams,
@@ -146,7 +129,7 @@ class ANWBScraper:
             }
             
         except Exception as e:
-            print(f"Error scraping ANWB data with Selenium: {str(e)}")
+            print(f"Error in main scraping coordinator: {str(e)}")
             return {
                 'traffic_jams': [],
                 'speed_cameras': [],
@@ -154,14 +137,123 @@ class ANWBScraper:
                 'total_jams': 0,
                 'error': str(e)
             }
+
+    def _scrape_traffic_jams_session(self) -> List[Dict]:
+        """Dedicated short session for traffic jam extraction"""
+        traffic_jams = []
+        driver = None
+        
+        try:
+            print("=== TRAFFIC JAM SESSION START ===")
+            
+            # Setup dedicated driver for traffic jams
+            driver = self._create_driver_session("traffic_jams")
+            if not driver:
+                return traffic_jams
+            
+            # Navigate to ANWB
+            driver.get(self.base_url)
+            print("Navigated to ANWB website")
+            
+            # Wait for page load
+            wait = WebDriverWait(driver, 15)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "article")))
+            time.sleep(3)
+            
+            # Extract traffic jams quickly
+            traffic_jams = self._extract_traffic_jams_fast(driver)
+            
+            print(f"=== TRAFFIC JAM SESSION END - Found {len(traffic_jams)} jams ===")
+            
+        except Exception as e:
+            print(f"Error in traffic jam session: {e}")
         finally:
-            # Clean up the driver
-            if self.driver:
+            # Always cleanup driver
+            if driver:
                 try:
-                    self.driver.quit()
+                    driver.quit()
                 except:
                     pass
-                self.driver = None
+        
+        return traffic_jams
+
+    def _scrape_flitsers_session(self) -> List[Dict]:
+        """Dedicated short session for flitser extraction"""
+        speed_cameras = []
+        driver = None
+        
+        try:
+            print("=== FLITSER SESSION START ===")
+            
+            # Setup dedicated driver for flitsers
+            driver = self._create_driver_session("flitsers")
+            if not driver:
+                return speed_cameras
+            
+            # Navigate to ANWB
+            driver.get(self.base_url)
+            print("Navigated to ANWB website for flitsers")
+            
+            # Wait for page load
+            wait = WebDriverWait(driver, 15)
+            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            time.sleep(3)
+            
+            # Extract flitsers quickly
+            speed_cameras = self._extract_flitsers_fast(driver)
+            
+            print(f"=== FLITSER SESSION END - Found {len(speed_cameras)} flitsers ===")
+            
+        except Exception as e:
+            print(f"Error in flitser session: {e}")
+        finally:
+            # Always cleanup driver
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+        
+        return speed_cameras
+
+    def _create_driver_session(self, session_type: str):
+        """Create a fresh ChromeDriver session with optimized settings"""
+        try:
+            print(f"Creating {session_type} driver session...")
+            
+            chrome_options = Options()
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--window-size=1280,720")  # Smaller window
+            chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument("--disable-plugins")
+            chrome_options.add_argument("--disable-images")  # Faster loading
+            chrome_options.add_argument("--disable-javascript")  # Re-enable for dynamic content
+            chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            
+            # Remove JavaScript disable for dynamic content
+            chrome_options.arguments.remove("--disable-javascript")
+            
+            # Use system Chromium
+            chrome_options.binary_location = "/usr/bin/chromium"
+            
+            # Use system chromedriver with shorter timeouts
+            service = Service("/usr/bin/chromedriver")
+            
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Set shorter timeouts for faster sessions
+            driver.set_page_load_timeout(20)
+            driver.implicitly_wait(5)
+            
+            print(f"Successfully created {session_type} driver session")
+            return driver
+            
+        except Exception as e:
+            print(f"Error creating {session_type} driver session: {e}")
+            return None
 
     def _extract_traffic_jams(self, soup: BeautifulSoup) -> List[Dict]:
         """Legacy extraction method - kept as backup"""
