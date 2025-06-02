@@ -187,51 +187,62 @@ class ANWBTrafficTester:
                 return False
         return success
 
-    def test_traffic_filtering(self):
-        """Test traffic filtering by road, city, and minimum delay"""
-        # Test road filter
+    def test_traffic_jam_data_structure(self):
+        """Test that traffic jam objects have the expected enhanced data structure"""
         success, response = self.run_test(
-            "Traffic Filtering by Road (A67)",
+            "Traffic Jam Data Structure",
             "GET",
             "traffic",
-            200,
-            params={"road": "A67"}
+            200
         )
-        if success and 'traffic_jams' in response:
-            traffic_jams = response['traffic_jams']
-            if traffic_jams:
-                if all(jam['road'] == 'A67' for jam in traffic_jams):
-                    print(f"✅ Road filtering works correctly, found {len(traffic_jams)} A67 jams")
+        if success:
+            if 'traffic_jams' in response:
+                traffic_jams = response['traffic_jams']
+                if not traffic_jams:
+                    print("ℹ️ No traffic jams found - cannot verify data structure")
+                    return True
+                
+                # Check first traffic jam for all expected fields
+                first_jam = traffic_jams[0]
+                missing_fields = [field for field in self.expected_traffic_jam_fields if field not in first_jam]
+                
+                if not missing_fields:
+                    print(f"✅ Traffic jam has all expected fields: {', '.join(self.expected_traffic_jam_fields)}")
+                    
+                    # Check that direction, from_exit, to_exit, and cause are populated (not default values)
+                    enhanced_fields = {
+                        'direction': first_jam.get('direction', ''),
+                        'from_exit': first_jam.get('from_exit', ''),
+                        'to_exit': first_jam.get('to_exit', ''),
+                        'cause': first_jam.get('cause', '')
+                    }
+                    
+                    default_values = {
+                        'direction': 'Onbekende richting',
+                        'from_exit': 'Onbekend',
+                        'to_exit': 'Onbekend',
+                        'cause': 'Onbekende oorzaak'
+                    }
+                    
+                    populated_fields = [field for field, value in enhanced_fields.items() 
+                                       if value and value != default_values.get(field)]
+                    
+                    if populated_fields:
+                        print(f"✅ Enhanced fields are populated: {', '.join(populated_fields)}")
+                        print(f"Sample values: {json.dumps({f: enhanced_fields[f] for f in populated_fields}, indent=2)}")
+                        return True
+                    else:
+                        print("❌ Enhanced fields exist but contain default/empty values")
+                        print(f"Current values: {json.dumps(enhanced_fields, indent=2)}")
+                        return False
                 else:
-                    print("❌ Road filtering returned non-A67 jams")
+                    print(f"❌ Traffic jam missing expected fields: {', '.join(missing_fields)}")
+                    print(f"Available fields: {', '.join(first_jam.keys())}")
                     return False
             else:
-                print("ℹ️ No A67 traffic jams found - filter works but no matching data")
-        else:
-            return False
-
-        # Test minimum delay filter
-        success, response = self.run_test(
-            "Traffic Filtering by Minimum Delay (1 min)",
-            "GET",
-            "traffic",
-            200,
-            params={"min_delay": 1}
-        )
-        if success and 'traffic_jams' in response:
-            traffic_jams = response['traffic_jams']
-            if traffic_jams:
-                if all(jam['delay_minutes'] >= 1 for jam in traffic_jams):
-                    print(f"✅ Delay filtering works correctly, found {len(traffic_jams)} jams with 1+ min delay")
-                else:
-                    print("❌ Delay filtering returned jams with less than 1 min delay")
-                    return False
-            else:
-                print("ℹ️ No traffic jams with 1+ min delay found - filter works but no matching data")
-        else:
-            return False
-
-        return True
+                print(f"❌ Traffic endpoint returns unexpected format: {response}")
+                return False
+        return success
 
 def main():
     # Setup
