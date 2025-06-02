@@ -365,7 +365,7 @@ class ANWBTrafficTester:
         return success
         
     def test_speed_camera_data_structure(self):
-        """Test that speed camera objects have the expected data structure"""
+        """Test that speed camera objects have the expected enhanced data structure"""
         success, response = self.run_test(
             "Speed Camera Data Structure",
             "GET",
@@ -386,21 +386,21 @@ class ANWBTrafficTester:
                 if not missing_fields:
                     print(f"✅ Speed camera has all expected fields: {', '.join(self.expected_speed_camera_fields)}")
                     
-                    # Check that camera_type is one of the expected types
-                    camera_type = first_camera.get('camera_type', '')
-                    if camera_type in self.expected_camera_types:
-                        print(f"✅ Camera type is valid: {camera_type}")
+                    # Check that flitser_type is one of the expected types
+                    flitser_type = first_camera.get('flitser_type', '')
+                    if flitser_type in self.expected_flitser_types:
+                        print(f"✅ Flitser type is valid: {flitser_type}")
                     else:
-                        print(f"❌ Unexpected camera type: {camera_type}")
-                        print(f"Expected one of: {', '.join(self.expected_camera_types)}")
+                        print(f"❌ Unexpected flitser type: {flitser_type}")
+                        print(f"Expected one of: {', '.join(self.expected_flitser_types)}")
                         return False
                     
-                    # Check that speed_limit is a reasonable value
-                    speed_limit = first_camera.get('speed_limit', 0)
-                    if isinstance(speed_limit, int) and 0 <= speed_limit <= 130:
-                        print(f"✅ Speed limit is valid: {speed_limit} km/h")
+                    # Check that is_active is a boolean
+                    is_active = first_camera.get('is_active')
+                    if isinstance(is_active, bool):
+                        print(f"✅ is_active is valid boolean: {is_active}")
                     else:
-                        print(f"❌ Unexpected speed limit value: {speed_limit}")
+                        print(f"❌ Unexpected is_active value: {is_active}, expected boolean")
                         return False
                     
                     print(f"Sample speed camera: {json.dumps(first_camera, indent=2, default=str)}")
