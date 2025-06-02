@@ -19,6 +19,14 @@ class ANWBTrafficTester:
             'id', 'road', 'direction', 'from_exit', 'to_exit', 'cause', 
             'delay_minutes', 'length_km', 'last_updated'
         ]
+        # Expected fields in speed camera objects
+        self.expected_speed_camera_fields = [
+            'id', 'road', 'location', 'direction', 'camera_type', 'speed_limit', 'last_updated'
+        ]
+        # Expected camera types
+        self.expected_camera_types = [
+            'Vaste flitser', 'Mobiele flitser', 'Trajectcontrole', 'Roodlichtcamera'
+        ]
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
         """Run a single API test"""
