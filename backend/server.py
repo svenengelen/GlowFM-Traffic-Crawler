@@ -72,45 +72,71 @@ MONITORED_CITIES = [
 class ANWBScraper:
     def __init__(self):
         self.base_url = "https://anwb.nl/verkeer/filelijst"
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        })
+        self.driver = None
+        
+    def _setup_driver(self):
+        """Set up Selenium WebDriver with Chrome"""
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        
+        # Use system Chromium
+        chrome_options.binary_location = "/usr/bin/chromium"
+        
+        # Initialize the driver
+        service = Service("/usr/bin/chromedriver") if os.path.exists("/usr/bin/chromedriver") else None
+        
+        try:
+            if service:
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            else:
+                # Try with webdriver-manager
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print(f"Error setting up Chrome driver: {e}")
+            # Fallback to system chromium
+            self.driver = webdriver.Chrome(options=chrome_options)
 
     def scrape_traffic_data(self) -> Dict:
-        """Scrape traffic data from ANWB website"""
+        """Scrape traffic data from ANWB website using Selenium"""
         try:
-            print(f"Scraping ANWB traffic data at {datetime.now()}")
+            print(f"Scraping ANWB traffic data with Selenium at {datetime.now()}")
             
-            # Add delay for respectful scraping
-            time.sleep(2)
+            # Setup WebDriver
+            self._setup_driver()
             
-            response = self.session.get(self.base_url, timeout=30)
-            response.raise_for_status()
+            # Navigate to the page
+            self.driver.get(self.base_url)
+            
+            # Wait for the page to load and traffic data to appear
+            print("Waiting for traffic data to load...")
+            wait = WebDriverWait(self.driver, 20)
+            
+            # Wait for traffic list to be present
+            try:
+                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "article[data-accordion-road]")))
+                print("Traffic data loaded successfully")
+            except:
+                print("Timeout waiting for traffic data, proceeding with available content")
+            
+            # Get the page source and parse with BeautifulSoup
+            html_content = self.driver.page_source
+            soup = BeautifulSoup(html_content, 'html.parser')
             
             # Save HTML for debugging
-            with open('/tmp/anwb_debug.html', 'w', encoding='utf-8') as f:
-                f.write(response.text)
-            print(f"Saved HTML to /tmp/anwb_debug.html, size: {len(response.text)} chars")
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Debug: try to find any articles at all
-            all_articles = soup.find_all('article')
-            print(f"Found {len(all_articles)} total articles")
-            
-            # Debug: try to find any divs with traffic-related classes
-            traffic_divs = soup.find_all('div', class_=lambda x: x and 'traffic' in x.lower())
-            print(f"Found {len(traffic_divs)} divs with 'traffic' in class name")
-            
-            # Debug: try to find any elements with road numbers
-            road_mentions = soup.find_all(text=lambda text: text and any(road in text for road in ['A2', 'A16', 'A50', 'A67']))
-            print(f"Found {len(road_mentions)} mentions of road numbers")
+            with open('/tmp/anwb_selenium_debug.html', 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            print(f"Saved Selenium HTML to /tmp/anwb_selenium_debug.html")
             
             # Extract traffic jams
             traffic_jams = self._extract_traffic_jams(soup)
             
-            # Extract speed cameras (when "Flitsers" checkbox is enabled)
+            # Extract speed cameras (placeholder for now)
             speed_cameras = self._extract_speed_cameras(soup)
             
             return {
@@ -121,7 +147,7 @@ class ANWBScraper:
             }
             
         except Exception as e:
-            print(f"Error scraping ANWB data: {str(e)}")
+            print(f"Error scraping ANWB data with Selenium: {str(e)}")
             return {
                 'traffic_jams': [],
                 'speed_cameras': [],
@@ -129,6 +155,14 @@ class ANWBScraper:
                 'total_jams': 0,
                 'error': str(e)
             }
+        finally:
+            # Clean up the driver
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except:
+                    pass
+                self.driver = None
 
     def _extract_traffic_jams(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract traffic jam data from HTML"""
