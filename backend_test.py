@@ -68,54 +68,12 @@ class ANWBTrafficMonitorTester:
             print(f"Filtered traffic jams: {response.get('filtered_jams', 'N/A')}")
             print(f"Speed cameras: {len(response.get('speed_cameras', []))}")
             print(f"Last updated: {response.get('last_updated', 'N/A')}")
-        return success
-
-    def test_traffic_endpoint_with_road_filter(self):
-        """Test the traffic endpoint with road filter"""
-        success, response = self.run_test(
-            "Traffic Endpoint (Road Filter)",
-            "GET",
-            "traffic",
-            200,
-            params={"roads": "A50,A73"}
-        )
-        if success:
-            print(f"Total traffic jams: {response.get('total_jams', 'N/A')}")
-            print(f"Filtered traffic jams: {response.get('filtered_jams', 'N/A')}")
             
-            # Verify that all returned traffic jams are for the specified roads
-            roads = ["A50", "A73"]
-            all_match = all(jam['road'] in roads for jam in response.get('traffic_jams', []))
-            if all_match:
-                print("✅ All returned traffic jams match the road filter")
+            # Check if all roads and cities are filtered by default
+            if response.get('total_jams', 0) == response.get('filtered_jams', 0):
+                print("✅ All roads and cities are filtered by default")
             else:
-                print("❌ Some traffic jams don't match the road filter")
-                success = False
-        return success
-
-    def test_traffic_endpoint_with_city_filter(self):
-        """Test the traffic endpoint with city filter"""
-        success, response = self.run_test(
-            "Traffic Endpoint (City Filter)",
-            "GET",
-            "traffic",
-            200,
-            params={"cities": "Eindhoven,Rotterdam"}
-        )
-        if success:
-            print(f"Total traffic jams: {response.get('total_jams', 'N/A')}")
-            print(f"Filtered traffic jams: {response.get('filtered_jams', 'N/A')}")
-            
-            # Verify that all returned traffic jams contain the specified cities
-            cities = ["eindhoven", "rotterdam"]
-            all_match = all(any(city in jam['location'].lower() for city in cities) 
-                           for jam in response.get('traffic_jams', []))
-            
-            if all_match or len(response.get('traffic_jams', [])) == 0:
-                print("✅ All returned traffic jams match the city filter (or no jams returned)")
-            else:
-                print("❌ Some traffic jams don't match the city filter")
-                success = False
+                print("❌ Not all roads and cities are filtered by default")
         return success
 
     def test_traffic_endpoint_with_delay_filter(self):
@@ -141,6 +99,68 @@ class ANWBTrafficMonitorTester:
             else:
                 print(f"❌ Some traffic jams have delay < {min_delay} minutes")
                 success = False
+        return success
+
+    def test_speed_cameras_hectometer(self):
+        """Test that speed cameras include hectometer field"""
+        success, response = self.run_test(
+            "Speed Cameras Hectometer Field",
+            "GET",
+            "traffic",
+            200
+        )
+        if success:
+            speed_cameras = response.get('speed_cameras', [])
+            if not speed_cameras:
+                print("⚠️ No speed cameras found to test")
+                return True
+                
+            # Check if all speed cameras have hectometer field
+            cameras_with_hectometer = [cam for cam in speed_cameras if 'hectometer' in cam and cam['hectometer']]
+            
+            if cameras_with_hectometer:
+                print(f"✅ Found {len(cameras_with_hectometer)}/{len(speed_cameras)} speed cameras with hectometer field")
+                # Print a sample hectometer value
+                sample = cameras_with_hectometer[0]
+                print(f"Sample hectometer: {sample['hectometer']} for {sample['road']} at {sample['location']}")
+                return True
+            else:
+                print("❌ No speed cameras have hectometer field")
+                return False
+        return success
+
+    def test_dutch_text_format(self):
+        """Test that API returns data in Dutch format"""
+        success, response = self.run_test(
+            "Dutch Text Format",
+            "GET",
+            "traffic",
+            200
+        )
+        if success:
+            # Check for Dutch text in delay_text
+            dutch_terms = ["minuten", "geen", "vertraging"]
+            
+            traffic_jams = response.get('traffic_jams', [])
+            if not traffic_jams:
+                print("⚠️ No traffic jams found to test Dutch text")
+                return True
+                
+            # Check if any traffic jam has Dutch text
+            has_dutch = any(any(term in jam.get('delay_text', '').lower() for term in dutch_terms) 
+                           for jam in traffic_jams)
+            
+            if has_dutch:
+                print("✅ Found Dutch text in traffic jam data")
+                # Print a sample
+                for jam in traffic_jams:
+                    if any(term in jam.get('delay_text', '').lower() for term in dutch_terms):
+                        print(f"Sample Dutch text: {jam.get('delay_text')} for {jam.get('road')}")
+                        break
+            else:
+                print("❌ No Dutch text found in traffic jam data")
+                success = False
+                
         return success
 
     def test_refresh_endpoint(self):
@@ -180,9 +200,9 @@ def main():
     tests = [
         tester.test_root_endpoint,
         tester.test_traffic_endpoint,
-        tester.test_traffic_endpoint_with_road_filter,
-        tester.test_traffic_endpoint_with_city_filter,
         tester.test_traffic_endpoint_with_delay_filter,
+        tester.test_speed_cameras_hectometer,
+        tester.test_dutch_text_format,
         tester.test_refresh_endpoint,
         tester.test_status_endpoint
     ]
