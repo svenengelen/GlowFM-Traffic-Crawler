@@ -356,15 +356,22 @@ function App() {
                         )}
                       </div>
 
-                      {/* Location */}
+                      {/* Location and Hectometer */}
                       {camera.location && camera.location !== 'Locatie onbekend' && (
                         <p className="text-sm text-gray-700 mb-1">
                           📍 {camera.location}
                         </p>
                       )}
 
+                      {/* Hectometer Information */}
+                      {camera.hectometer && camera.hectometer !== 'Hectometer onbekend' && (
+                        <p className="text-sm text-purple-600 mb-1">
+                          🚩 {camera.hectometer}
+                        </p>
+                      )}
+
                       {/* Direction */}
-                      {camera.direction && camera.direction !== 'Onbekende richting' && (
+                      {camera.direction && camera.direction !== 'Richting onbekend' && (
                         <p className="text-sm text-blue-600 mb-1">
                           🧭 {camera.direction}
                         </p>
