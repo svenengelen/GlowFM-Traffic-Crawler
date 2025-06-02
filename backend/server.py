@@ -206,13 +206,20 @@ class ANWBScraper:
             if len(traffic_jams) == 0:
                 logger.info("No traffic jams found, adding monitoring entries for target roads")
                 monitoring_data = [
-                    {"road": "A50", "location": "Eindhoven - 's-Hertogenbosch"},
-                    {"road": "A73", "location": "Maasbracht - Nijmegen"},
                     {"road": "A2", "location": "Eindhoven - Weert"},
-                    {"road": "A58", "location": "Breda - Tilburg"},
                     {"road": "A16", "location": "Rotterdam - Breda"},
+                    {"road": "A50", "location": "Eindhoven - 's-Hertogenbosch"},
+                    {"road": "A58", "location": "Breda - Tilburg"},
+                    {"road": "A59", "location": "Roosendaal - 's-Hertogenbosch"},
+                    {"road": "A65", "location": "Tilburg - Eindhoven"},
                     {"road": "A67", "location": "Eindhoven - Venlo"},
-                    {"road": "N2", "location": "Maastricht - Belgische Grens"}
+                    {"road": "A73", "location": "Maasbracht - Nijmegen"},
+                    {"road": "A76", "location": "Geleen - Heerlen"},
+                    {"road": "A270", "location": "'s-Hertogenbosch - Veghel"},
+                    {"road": "N2", "location": "Maastricht - Belgische Grens"},
+                    {"road": "N69", "location": "Valkenswaard - Eindhoven"},
+                    {"road": "N266", "location": "Roosendaal - Etten-Leur"},
+                    {"road": "N270", "location": "Helmond - Deurne"}
                 ]
                 
                 for data in monitoring_data:
@@ -220,30 +227,14 @@ class ANWBScraper:
                         road=data["road"],
                         location=data["location"],
                         delay_minutes=0,
-                        delay_text="No current delays",
+                        delay_text="Geen files",
                         length_km=0.0,
-                        length_text="Clear"
+                        length_text="Vrij"
                     )
                     traffic_jams.append(traffic_jam)
                 
-                # Add sample speed cameras for monitoring
-                camera_data = [
-                    {"road": "A2", "location": "Eindhoven Zuid", "hectometer": "124.8"},
-                    {"road": "A50", "location": "'s-Hertogenbosch Noord", "hectometer": "89.2"},
-                    {"road": "A73", "location": "Venlo Centrum", "hectometer": "67.5"},
-                    {"road": "A58", "location": "Breda Oost", "hectometer": "103.1"},
-                    {"road": "N69", "location": "Valkenswaard", "hectometer": "15.7"},
-                    {"road": "A16", "location": "Rotterdam Zuid", "hectometer": "45.3"},
-                    {"road": "A67", "location": "Eindhoven Noord", "hectometer": "78.9"}
-                ]
-                
-                for data in camera_data:
-                    camera = SpeedCamera(
-                        road=data["road"],
-                        location=data["location"],
-                        hectometer=data["hectometer"]
-                    )
-                    speed_cameras.append(camera)
+                # Do NOT add speed cameras when there are no real ones
+                # Only add speed cameras if actually found from ANWB scraping
             
             # Clear old data and store new data
             await db.traffic_jams.delete_many({})
