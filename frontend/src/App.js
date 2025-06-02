@@ -40,7 +40,7 @@ function App() {
     
     // A50 exits (Eindhoven – Oss – Arnhem)
     "Industrie Ekkersrijt", "Son en Breugel", "St. Oedenrode", "Eerde", "Veghel-Noord",
-    "Volkel", "Zeeland", "Nistelrode", "Ravenstein", "Valburg", "Heteren", "Renkum",
+    "Volkel", "Zeeland", "Nistelrode", "Ravenstein", "Valburg", "Heteren", "Renkum", "Arnhem",
     
     // A58 exits (Eindhoven – Tilburg – Breda)
     "Oirschot", "Moergestel", "Tilburg-Centrum-Oost", "Tilburg-Centrum-West",
