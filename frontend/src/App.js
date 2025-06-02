@@ -398,15 +398,133 @@ function App() {
 
         {/* Speed Cameras Tab */}
         {activeTab === 'cameras' && (
-          <div className="bg-white rounded-lg shadow-md">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Flitspalen</h3>
-            </div>
-            
-            <div className="p-8 text-center">
-              <div className="text-blue-500 text-4xl mb-4">🚧</div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Flitspalen Binnenkort Beschikbaar</h3>
-              <p className="text-gray-600">Flitspaal informatie wordt toegevoegd in een toekomstige update.</p>
+          <div>
+            {/* Speed Camera Stats */}
+            {trafficData && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-orange-100 text-orange-600">
+                      📷
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Totaal Flitspalen</p>
+                      <p className="text-2xl font-semibold text-gray-900">{trafficData.speed_cameras.length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+                      🚨
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Vaste Flitsers</p>
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {trafficData.speed_cameras.filter(cam => cam.camera_type === 'Vaste flitser').length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center">
+                    <div className="p-3 rounded-full bg-green-100 text-green-600">
+                      🛣️
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600">Trajectcontroles</p>
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {trafficData.speed_cameras.filter(cam => cam.camera_type === 'Trajectcontrole').length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Speed Cameras List */}
+            <div className="bg-white rounded-lg shadow-md">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900">Flitspalen</h3>
+              </div>
+              
+              {loading && (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-4 text-gray-600">Flitspaal informatie laden...</p>
+                </div>
+              )}
+
+              {!loading && trafficData && trafficData.speed_cameras.length === 0 && (
+                <div className="p-8 text-center">
+                  <div className="text-blue-500 text-4xl mb-4">📷</div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Geen Flitspalen</h3>
+                  <p className="text-gray-600">Geen flitspalen gevonden die voldoen aan uw criteria.</p>
+                </div>
+              )}
+
+              {!loading && trafficData && trafficData.speed_cameras.length > 0 && (
+                <div className="divide-y divide-gray-200">
+                  {trafficData.speed_cameras.map((camera, index) => (
+                    <div key={camera.id || index} className="p-6 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-3">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(camera.road)}`}>
+                              {camera.road}
+                            </span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                              {camera.camera_type}
+                            </span>
+                            {camera.speed_limit > 0 && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                {camera.speed_limit} km/h
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Location */}
+                          {camera.location && camera.location !== 'Locatie onbekend' && (
+                            <p className="text-sm text-gray-700 mb-1">
+                              📍 {camera.location}
+                            </p>
+                          )}
+
+                          {/* Direction */}
+                          {camera.direction && camera.direction !== 'Onbekende richting' && (
+                            <p className="text-sm text-blue-600 mb-1">
+                              🧭 {camera.direction}
+                            </p>
+                          )}
+
+                          {/* Camera Type Details */}
+                          <div className="flex items-center space-x-4 mt-2">
+                            {camera.camera_type === 'Vaste flitser' && (
+                              <span className="text-xs text-gray-500">📷 Vaste snelheidscontrole</span>
+                            )}
+                            {camera.camera_type === 'Trajectcontrole' && (
+                              <span className="text-xs text-gray-500">🛣️ Gemiddelde snelheid over traject</span>
+                            )}
+                            {camera.camera_type === 'Mobiele flitser' && (
+                              <span className="text-xs text-gray-500">🚐 Tijdelijke/mobiele controle</span>
+                            )}
+                            {camera.camera_type === 'Roodlichtcamera' && (
+                              <span className="text-xs text-gray-500">🚦 Roodlicht controle</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-4 text-right">
+                          <p className="text-xs text-gray-500">
+                            Bijgewerkt: {new Date(camera.last_updated).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
