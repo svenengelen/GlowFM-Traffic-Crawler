@@ -775,26 +775,70 @@ async def get_traffic_data(
         
         data = doc['data']
         traffic_jams = data.get('traffic_jams', [])
+        speed_cameras = data.get('speed_cameras', [])
         
-        # Apply filters
+        # Apply filters to traffic jams
         if road:
             traffic_jams = [jam for jam in traffic_jams if jam['road'].upper() == road.upper()]
         
         if city:
-            traffic_jams = [jam for jam in traffic_jams if city.lower() in jam['location'].lower()]
+            traffic_jams = [jam for jam in traffic_jams if city.lower() in jam.get('from_exit', '').lower() or 
+                           city.lower() in jam.get('to_exit', '').lower() or 
+                           city.lower() in jam.get('direction', '').lower()]
         
         if min_delay:
             traffic_jams = [jam for jam in traffic_jams if jam['delay_minutes'] >= min_delay]
         
+        # Apply filters to speed cameras
+        if road:
+            speed_cameras = [cam for cam in speed_cameras if cam['road'].upper() == road.upper()]
+        
+        if city:
+            speed_cameras = [cam for cam in speed_cameras if city.lower() in cam.get('location', '').lower() or 
+                            city.lower() in cam.get('direction', '').lower()]
+        
         return TrafficData(
             traffic_jams=[TrafficJam(**jam) for jam in traffic_jams],
-            speed_cameras=[SpeedCamera(**cam) for cam in data.get('speed_cameras', [])],
+            speed_cameras=[SpeedCamera(**cam) for cam in speed_cameras],
             last_updated=data['last_updated'],
             total_jams=len(traffic_jams)
         )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving traffic data: {str(e)}")
+
+@app.get("/api/speed-cameras")
+async def get_speed_cameras(
+    road: Optional[str] = None,
+    city: Optional[str] = None
+):
+    """Get speed camera data with optional filtering"""
+    try:
+        # Get latest data from MongoDB
+        doc = await db.traffic_data.find_one({'type': 'latest'})
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail="No speed camera data available")
+        
+        data = doc['data']
+        speed_cameras = data.get('speed_cameras', [])
+        
+        # Apply filters
+        if road:
+            speed_cameras = [cam for cam in speed_cameras if cam['road'].upper() == road.upper()]
+        
+        if city:
+            speed_cameras = [cam for cam in speed_cameras if city.lower() in cam.get('location', '').lower() or 
+                            city.lower() in cam.get('direction', '').lower()]
+        
+        return {
+            "speed_cameras": [SpeedCamera(**cam) for cam in speed_cameras],
+            "total_cameras": len(speed_cameras),
+            "last_updated": data['last_updated']
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving speed camera data: {str(e)}")
 
 @app.post("/api/traffic/refresh")
 async def refresh_traffic_data():
