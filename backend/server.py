@@ -129,7 +129,7 @@ class ANWBScraper:
             time.sleep(3)
             
             # Extract traffic jams by expanding each accordion
-            traffic_jams = self._extract_detailed_traffic_jams()
+            traffic_jams = self._extract_traffic_jams_detailed()
             
             # Extract speed cameras (placeholder for now)
             speed_cameras = []
