@@ -12,6 +12,13 @@ from bs4 import BeautifulSoup
 import re
 import threading
 import schedule
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 
 # Configuration
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
