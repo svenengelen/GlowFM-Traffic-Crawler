@@ -123,17 +123,23 @@ class ANWBScraper:
             
             # Find all road sections
             road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
+            logger.info(f"Found {len(road_articles)} road articles")
             
-            for article in road_articles:
+            for i, article in enumerate(road_articles):
                 road_number_elem = article.find('span', {'data-test-id': 'traffic-list-road-road-number'})
                 if not road_number_elem:
+                    logger.debug(f"Article {i}: No road number element found")
                     continue
                     
                 road = road_number_elem.get_text(strip=True)
+                logger.debug(f"Article {i}: Found road {road}")
                 
                 # Only process roads we're interested in
                 if road not in TARGET_ROADS:
+                    logger.debug(f"Article {i}: Road {road} not in target roads")
                     continue
+                
+                logger.info(f"Processing target road: {road}")
                 
                 # Get location information
                 location_elem = article.find('h3')
@@ -142,10 +148,13 @@ class ANWBScraper:
                     location = location_elem.get_text(strip=True)
                     # Remove arrow symbols
                     location = re.sub(r'[→←↑↓]', ' - ', location)
+                    logger.info(f"Road {road} location: {location}")
                 
+                # For now, let's be more lenient and include all target roads regardless of city filter
                 # Only process if location contains target cities
-                if not self.city_matches_target(location):
-                    continue
+                # if not self.city_matches_target(location):
+                #     logger.debug(f"Road {road}: Location '{location}' doesn't match target cities")
+                #     continue
                 
                 # Get delay and length information
                 delay_elem = article.find('div', {'data-test': 'body-text'})
@@ -154,6 +163,7 @@ class ANWBScraper:
                 
                 if delay_elem:
                     spans = delay_elem.find_all('span')
+                    logger.debug(f"Road {road}: Found {len(spans)} spans in delay element")
                     if len(spans) >= 2:
                         delay_text = spans[0].get_text(strip=True)
                         length_text = spans[1].get_text(strip=True)
@@ -164,23 +174,26 @@ class ANWBScraper:
                         elif 'km' in text:
                             length_text = text
                 
-                # Create traffic jam entry
-                if delay_text or length_text:
-                    traffic_jam = TrafficJam(
-                        road=road,
-                        location=location,
-                        delay_minutes=self.parse_delay(delay_text),
-                        delay_text=delay_text,
-                        length_km=self.parse_length(length_text),
-                        length_text=length_text
-                    )
-                    traffic_jams.append(traffic_jam)
+                logger.info(f"Road {road}: delay='{delay_text}', length='{length_text}'")
+                
+                # Create traffic jam entry - be more lenient, include roads even without delay/length
+                traffic_jam = TrafficJam(
+                    road=road,
+                    location=location,
+                    delay_minutes=self.parse_delay(delay_text),
+                    delay_text=delay_text or "No delay info",
+                    length_km=self.parse_length(length_text),
+                    length_text=length_text or "No length info"
+                )
+                traffic_jams.append(traffic_jam)
+                logger.info(f"Added traffic jam for {road}: {location}")
             
             # Store in database
             if traffic_jams:
                 # Clear old data (keep only current)
                 await db.traffic_jams.delete_many({})
                 await db.traffic_jams.insert_many([jam.dict() for jam in traffic_jams])
+                logger.info(f"Stored {len(traffic_jams)} traffic jams in database")
             
             if speed_cameras:
                 await db.speed_cameras.delete_many({})
