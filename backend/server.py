@@ -487,6 +487,192 @@ class ANWBScraper:
         
         return "Onbekende oorzaak"
 
+    def _extract_speed_cameras_detailed(self) -> List[Dict]:
+        """Extract speed camera data by enabling the Flitsers checkbox"""
+        speed_cameras = []
+        
+        try:
+            print("Starting speed camera extraction...")
+            
+            # First, enable the "Flitsers" (speed cameras) checkbox
+            try:
+                # Look for the speed cameras checkbox
+                flitsers_checkbox = self.driver.find_element(By.XPATH, "//input[@type='checkbox' and contains(@name, 'flits') or contains(@id, 'flits')]")
+                if not flitsers_checkbox.is_selected():
+                    self.driver.execute_script("arguments[0].click();", flitsers_checkbox)
+                    print("Enabled Flitsers checkbox")
+                    time.sleep(3)  # Wait for page to update
+                else:
+                    print("Flitsers checkbox already enabled")
+            except Exception as e:
+                print(f"Could not find or enable Flitsers checkbox: {e}")
+                # Try alternative approach - look for speed camera toggle
+                try:
+                    speed_cam_toggle = self.driver.find_element(By.XPATH, "//label[contains(text(), 'Flitsers') or contains(text(), 'flits')]")
+                    self.driver.execute_script("arguments[0].click();", speed_cam_toggle)
+                    print("Clicked speed camera toggle")
+                    time.sleep(3)
+                except Exception as e2:
+                    print(f"Could not find speed camera toggle: {e2}")
+                    # Continue anyway and see if speed cameras are already visible
+            
+            # Now extract speed camera information
+            try:
+                # Look for speed camera elements - they might be in a different section or have different selectors
+                camera_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'flitser') or contains(text(), 'camera') or contains(text(), 'snelheid')]")
+                
+                if not camera_elements:
+                    # Try looking for specific speed camera data structures
+                    camera_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-test-id*='camera'], [data-test-id*='flits'], .speed-camera, .flitser")
+                
+                print(f"Found {len(camera_elements)} potential speed camera elements")
+                
+                if camera_elements:
+                    for idx, element in enumerate(camera_elements):
+                        try:
+                            camera_data = self._extract_speed_camera_details(element, idx)
+                            if camera_data:
+                                speed_cameras.append(camera_data)
+                        except Exception as e:
+                            print(f"Error extracting speed camera {idx}: {e}")
+                            continue
+                
+                # Alternative approach: Look for speed cameras in road articles
+                if not speed_cameras:
+                    print("No dedicated speed camera elements found, checking road articles...")
+                    road_articles = self.driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
+                    
+                    for article in road_articles:
+                        try:
+                            road = article.get_attribute('data-accordion-road')
+                            if road and road in MONITORED_ROADS:
+                                # Check if this road article contains speed camera information
+                                article_text = article.text.lower()
+                                if any(keyword in article_text for keyword in ['flitser', 'camera', 'snelheidscontrole']):
+                                    print(f"Found speed camera reference in {road}")
+                                    camera_data = self._extract_speed_camera_from_road(article, road)
+                                    if camera_data:
+                                        speed_cameras.append(camera_data)
+                        except Exception as e:
+                            print(f"Error checking road article for speed cameras: {e}")
+                            continue
+                            
+            except Exception as e:
+                print(f"Error extracting speed camera elements: {e}")
+                
+        except Exception as e:
+            print(f"Error in _extract_speed_cameras_detailed: {e}")
+        
+        print(f"Total speed cameras extracted: {len(speed_cameras)}")
+        return speed_cameras
+
+    def _extract_speed_camera_details(self, element, idx: int) -> Dict:
+        """Extract details from a speed camera element"""
+        try:
+            text_content = element.text.strip()
+            
+            if not text_content or len(text_content) < 5:
+                return None
+            
+            print(f"Processing speed camera element {idx}: {text_content}")
+            
+            # Extract road information
+            road = self._extract_road_from_text(text_content)
+            
+            # Extract location
+            location = self._extract_camera_location(text_content)
+            
+            # Extract direction
+            direction = self._extract_direction(text_content)
+            
+            # Extract camera type and speed limit
+            camera_type, speed_limit = self._extract_camera_type_and_limit(text_content)
+            
+            if road and road in MONITORED_ROADS:
+                return {
+                    'id': f"camera_{road}_{int(time.time())}_{idx}",
+                    'road': road,
+                    'location': location,
+                    'direction': direction,
+                    'camera_type': camera_type,
+                    'speed_limit': speed_limit,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting speed camera details: {e}")
+        
+        return None
+
+    def _extract_speed_camera_from_road(self, article_element, road: str) -> Dict:
+        """Extract speed camera data from a road article"""
+        try:
+            text_content = article_element.text.strip()
+            
+            # Look for speed camera specific information in the road article
+            if any(keyword in text_content.lower() for keyword in ['flitser', 'camera', 'snelheidscontrole']):
+                location = self._extract_camera_location(text_content)
+                direction = self._extract_direction(text_content)
+                camera_type, speed_limit = self._extract_camera_type_and_limit(text_content)
+                
+                return {
+                    'id': f"camera_{road}_{int(time.time())}_0",
+                    'road': road,
+                    'location': location,
+                    'direction': direction,
+                    'camera_type': camera_type,
+                    'speed_limit': speed_limit,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting speed camera from road: {e}")
+        
+        return None
+
+    def _extract_road_from_text(self, text: str) -> str:
+        """Extract road number from text"""
+        # Look for road patterns like A67, N2, etc.
+        road_match = re.search(r'\b([AN]\d+)\b', text.upper())
+        if road_match:
+            return road_match.group(1)
+        return ""
+
+    def _extract_camera_location(self, text: str) -> str:
+        """Extract camera location from text"""
+        # Remove road numbers and common words to get location
+        location = re.sub(r'\b[AN]\d+\b', '', text)
+        location = re.sub(r'\b(flitser|camera|snelheidscontrole|km/h|kmh)\b', '', location, flags=re.IGNORECASE)
+        location = re.sub(r'\s+', ' ', location).strip()
+        
+        # If location is too short or empty, return a default
+        if len(location) < 3:
+            return "Locatie onbekend"
+        
+        return location[:100]  # Limit length
+
+    def _extract_camera_type_and_limit(self, text: str) -> tuple:
+        """Extract camera type and speed limit from text"""
+        camera_type = "Vaste flitser"  # Default
+        speed_limit = 0
+        
+        text_lower = text.lower()
+        
+        # Look for speed limit
+        speed_match = re.search(r'(\d+)\s*km/h', text_lower)
+        if speed_match:
+            speed_limit = int(speed_match.group(1))
+        
+        # Determine camera type based on keywords
+        if any(keyword in text_lower for keyword in ['mobiel', 'verplaatsbaar', 'tijdelijk']):
+            camera_type = "Mobiele flitser"
+        elif any(keyword in text_lower for keyword in ['trajectcontrole', 'traject']):
+            camera_type = "Trajectcontrole"
+        elif any(keyword in text_lower for keyword in ['roodlicht', 'stoplicht']):
+            camera_type = "Roodlichtcamera"
+        
+        return camera_type, speed_limit
+
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
