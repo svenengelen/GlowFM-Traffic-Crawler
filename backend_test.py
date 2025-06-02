@@ -464,13 +464,18 @@ def main():
     tests = [
         tester.test_health_endpoint,
         tester.test_traffic_endpoint,
-        tester.test_traffic_jam_data_structure,  # New test for enhanced data structure
+        tester.test_traffic_jam_data_structure,
         tester.test_a67_traffic_jam,
         tester.test_roads_endpoint,
         tester.test_cities_endpoint,
         tester.test_refresh_endpoint,
         tester.test_traffic_filtering,
-        tester.test_road_types  # New test for A-roads and N-roads
+        tester.test_road_types,
+        # Speed camera tests
+        tester.test_speed_cameras_endpoint,
+        tester.test_speed_cameras_in_traffic_endpoint,
+        tester.test_speed_camera_data_structure,
+        tester.test_speed_camera_filtering
     ]
     
     for test in tests:
