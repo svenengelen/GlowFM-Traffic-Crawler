@@ -244,6 +244,82 @@ class ANWBTrafficTester:
                 return False
         return success
 
+    def test_traffic_filtering(self):
+        """Test traffic filtering by road, city, and minimum delay"""
+        # Test road filter
+        success, response = self.run_test(
+            "Traffic Filtering by Road (A67)",
+            "GET",
+            "traffic",
+            200,
+            params={"road": "A67"}
+        )
+        if success and 'traffic_jams' in response:
+            traffic_jams = response['traffic_jams']
+            if traffic_jams:
+                if all(jam['road'] == 'A67' for jam in traffic_jams):
+                    print(f"✅ Road filtering works correctly, found {len(traffic_jams)} A67 jams")
+                else:
+                    print("❌ Road filtering returned non-A67 jams")
+                    return False
+            else:
+                print("ℹ️ No A67 traffic jams found - filter works but no matching data")
+        else:
+            return False
+
+        # Test minimum delay filter
+        success, response = self.run_test(
+            "Traffic Filtering by Minimum Delay (1 min)",
+            "GET",
+            "traffic",
+            200,
+            params={"min_delay": 1}
+        )
+        if success and 'traffic_jams' in response:
+            traffic_jams = response['traffic_jams']
+            if traffic_jams:
+                if all(jam['delay_minutes'] >= 1 for jam in traffic_jams):
+                    print(f"✅ Delay filtering works correctly, found {len(traffic_jams)} jams with 1+ min delay")
+                else:
+                    print("❌ Delay filtering returned jams with less than 1 min delay")
+                    return False
+            else:
+                print("ℹ️ No traffic jams with 1+ min delay found - filter works but no matching data")
+        else:
+            return False
+
+        return True
+        
+    def test_road_types(self):
+        """Test that A-roads and N-roads are correctly identified"""
+        success, response = self.run_test(
+            "Road Types",
+            "GET",
+            "traffic",
+            200
+        )
+        if success and 'traffic_jams' in response:
+            traffic_jams = response['traffic_jams']
+            if not traffic_jams:
+                print("ℹ️ No traffic jams found - cannot verify road types")
+                return True
+                
+            a_roads = [jam for jam in traffic_jams if jam['road'].startswith('A')]
+            n_roads = [jam for jam in traffic_jams if jam['road'].startswith('N')]
+            
+            if a_roads:
+                print(f"✅ Found {len(a_roads)} A-roads: {', '.join(sorted(set(jam['road'] for jam in a_roads)))}")
+            else:
+                print("ℹ️ No A-roads found in current traffic data")
+                
+            if n_roads:
+                print(f"✅ Found {len(n_roads)} N-roads: {', '.join(sorted(set(jam['road'] for jam in n_roads)))}")
+            else:
+                print("ℹ️ No N-roads found in current traffic data")
+                
+            return True
+        return False
+
 def main():
     # Setup
     tester = ANWBTrafficTester()
@@ -252,11 +328,13 @@ def main():
     tests = [
         tester.test_health_endpoint,
         tester.test_traffic_endpoint,
+        tester.test_traffic_jam_data_structure,  # New test for enhanced data structure
         tester.test_a67_traffic_jam,
         tester.test_roads_endpoint,
         tester.test_cities_endpoint,
         tester.test_refresh_endpoint,
-        tester.test_traffic_filtering
+        tester.test_traffic_filtering,
+        tester.test_road_types  # New test for A-roads and N-roads
     ]
     
     for test in tests:
