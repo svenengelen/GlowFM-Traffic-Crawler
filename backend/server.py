@@ -240,7 +240,7 @@ class ANWBScraper:
         return traffic_jams
 
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
-        """Extract speed camera data from HTML"""
+        """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
         # For now, returning empty list as it requires additional interaction
         speed_cameras = []
