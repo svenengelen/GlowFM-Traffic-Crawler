@@ -160,7 +160,7 @@ class ANWBScraper:
                 self.driver = None
 
     def _extract_traffic_jams(self, soup: BeautifulSoup) -> List[Dict]:
-        """Extract traffic jam data from HTML"""
+        """Legacy extraction method - kept as backup"""
         traffic_jams = []
         
         # Find all road articles using the correct selectors from our analysis
@@ -195,7 +195,6 @@ class ANWBScraper:
                 
                 # Look for traffic data in the specific div structure we saw in HTML
                 delay_info = article.find('div', class_='sc-fd0a2c7e-6')
-                location_info = article.find('h3', class_='sc-fd0a2c7e-5')
                 
                 # Also check for totals div that shows "2 files" etc
                 totals_info = article.find('div', {'data-test-id': 'traffic-list-road-totals'})
@@ -212,21 +211,15 @@ class ANWBScraper:
                     
                     print(f"Found traffic data: {delay_text}, delay={delay_minutes}min, length={length_km}km")
                     
-                    # Extract location
-                    location = "Unknown"
-                    if location_info:
-                        location = location_info.get_text(strip=True)
-                        location = re.sub(r'[→←]', ' - ', location)  # Replace arrows with dashes
-                        location = re.sub(r'\s+', ' ', location)  # Clean up multiple spaces
-                    
-                    print(f"Location: {location}")
-                    
                     # Only add if we have meaningful delay information
                     if delay_minutes > 0:
                         traffic_jam = {
                             'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
                             'road': road,
-                            'location': location,
+                            'direction': 'Onbekende richting',
+                            'from_exit': 'Onbekend',
+                            'to_exit': 'Onbekend', 
+                            'cause': 'Onbekende oorzaak',
                             'delay_minutes': delay_minutes,
                             'length_km': length_km,
                             'last_updated': datetime.now()
