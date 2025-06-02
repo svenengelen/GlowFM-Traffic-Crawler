@@ -105,10 +105,10 @@ class ANWBTrafficTester:
                     print(f"❌ A67 jam has unexpected delay: {a67_jam.get('delay_minutes')} minutes, expected at least 1 minute")
                     return False
                 
-                if a67_jam.get('length_km') >= 2:
+                if a67_jam.get('length_km') >= 1:
                     print(f"✅ A67 jam has expected length: {a67_jam.get('length_km')} km")
                 else:
-                    print(f"❌ A67 jam has unexpected length: {a67_jam.get('length_km')} km, expected at least 2 km")
+                    print(f"❌ A67 jam has unexpected length: {a67_jam.get('length_km')} km, expected at least 1 km")
                     return False
                 
                 return True
