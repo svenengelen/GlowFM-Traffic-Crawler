@@ -213,7 +213,7 @@ function App() {
               <div className="divide-y divide-gray-200">
                 {trafficData.traffic_jams.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
-                    Geen files gevonden met de huidige filters
+                    Geen files, door naar de hits!
                   </div>
                 ) : (
                   trafficData.traffic_jams.map((jam, index) => (
