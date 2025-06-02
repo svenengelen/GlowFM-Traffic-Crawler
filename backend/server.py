@@ -255,6 +255,219 @@ class ANWBScraper:
             print(f"Error creating {session_type} driver session: {e}")
             return None
 
+    def _extract_traffic_jams_fast(self, driver) -> List[Dict]:
+        """Fast traffic jam extraction with minimal accordion interaction"""
+        traffic_jams = []
+        
+        try:
+            print("Starting fast traffic jam extraction...")
+            
+            # Find all road articles quickly
+            road_articles = driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
+            print(f"Found {len(road_articles)} road articles")
+            
+            for article in road_articles:
+                try:
+                    # Get road number
+                    road = article.get_attribute('data-accordion-road')
+                    if not road or road not in MONITORED_ROADS:
+                        continue
+                    
+                    print(f"Processing road: {road}")
+                    
+                    # Check if there are traffic jams (look for summary info)
+                    try:
+                        # Look for delay and length info in the collapsed view
+                        summary_info = article.find_element(By.CSS_SELECTOR, "[class*='sc-fd0a2c7e-6'], [class*='sc-fd0a2c7e-4']")
+                        summary_text = summary_info.text.strip()
+                        
+                        if summary_text and ('+' in summary_text or 'min' in summary_text):
+                            print(f"Found traffic summary for {road}: {summary_text}")
+                            
+                            # Extract delay and length from summary
+                            delay_minutes = self._extract_delay_minutes(summary_text)
+                            length_km = self._extract_length_km(summary_text)
+                            
+                            if delay_minutes > 0:
+                                # Try to click and get more details (but timeout quickly)
+                                direction = "Onbekende richting"
+                                route_details = "Route onbekend"
+                                cause = "Oorzaak onbekend"
+                                
+                                try:
+                                    # Quick click to expand
+                                    button = article.find_element(By.CSS_SELECTOR, "button")
+                                    driver.execute_script("arguments[0].click();", button)
+                                    time.sleep(1)  # Short wait
+                                    
+                                    # Get expanded content quickly
+                                    expanded_text = article.text
+                                    direction, source_location, destination_location = self._extract_detailed_direction_and_locations(expanded_text, [])
+                                    route_details = self._extract_route_details(expanded_text, [])
+                                    cause = self._extract_detailed_cause(expanded_text, [])
+                                    
+                                except Exception as e:
+                                    print(f"Could not expand {road} accordion: {e}")
+                                    # Use fallback values
+                                    source_location = "Onbekend"
+                                    destination_location = "Onbekend"
+                                
+                                traffic_jam = {
+                                    'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
+                                    'road': road,
+                                    'direction': direction,
+                                    'source_location': source_location,
+                                    'destination_location': destination_location,
+                                    'route_details': route_details,
+                                    'cause': cause,
+                                    'delay_minutes': delay_minutes,
+                                    'length_km': length_km,
+                                    'last_updated': datetime.now()
+                                }
+                                traffic_jams.append(traffic_jam)
+                                print(f"Added traffic jam: {road} - {delay_minutes}min, {length_km}km")
+                    
+                    except Exception as e:
+                        print(f"No traffic summary found for {road}")
+                        continue
+                        
+                except Exception as e:
+                    print(f"Error processing road {road}: {e}")
+                    continue
+            
+        except Exception as e:
+            print(f"Error in fast traffic extraction: {e}")
+        
+        print(f"Fast traffic extraction complete: {len(traffic_jams)} jams found")
+        return traffic_jams
+
+    def _extract_flitsers_fast(self, driver) -> List[Dict]:
+        """Fast flitser extraction focused on finding active flitsers"""
+        speed_cameras = []
+        
+        try:
+            print("Starting fast flitser extraction...")
+            
+            # First, try to enable flitsers quickly
+            try:
+                # Look for any checkbox or toggle related to flitsers
+                possible_toggles = driver.find_elements(By.XPATH, "//*[contains(text(), 'flits') or contains(text(), 'Flits')]")
+                
+                for toggle in possible_toggles[:3]:  # Only try first few
+                    try:
+                        # Try to click the toggle
+                        driver.execute_script("arguments[0].click();", toggle)
+                        print(f"Clicked potential flitser toggle: {toggle.text[:30]}")
+                        time.sleep(1)
+                        break
+                    except:
+                        continue
+                        
+            except Exception as e:
+                print(f"Could not enable flitser toggle: {e}")
+            
+            # Now look for flitser data in the page
+            try:
+                # Search for elements containing flitser information
+                flitser_selectors = [
+                    "//*[contains(text(), 'flitser')]",
+                    "//*[contains(text(), 'Flitser')]",
+                    "//*[contains(text(), 'snelheidscontrole')]",
+                    "//*[contains(text(), 'camera')]"
+                ]
+                
+                all_flitser_elements = []
+                for selector in flitser_selectors:
+                    try:
+                        elements = driver.find_elements(By.XPATH, selector)
+                        all_flitser_elements.extend(elements)
+                    except:
+                        continue
+                
+                print(f"Found {len(all_flitser_elements)} potential flitser elements")
+                
+                # Process each element quickly
+                processed_texts = set()
+                for idx, element in enumerate(all_flitser_elements[:10]):  # Limit to first 10
+                    try:
+                        element_text = element.text.strip()
+                        
+                        # Skip if we've seen this text or it's too short
+                        if not element_text or len(element_text) < 5 or element_text in processed_texts:
+                            continue
+                        
+                        processed_texts.add(element_text)
+                        
+                        print(f"Processing flitser element {idx}: '{element_text}'")
+                        
+                        # Look for road information in the element or nearby
+                        road = self._extract_road_from_text(element_text)
+                        
+                        # If no road in element text, check parent or nearby elements
+                        if not road:
+                            try:
+                                # Check parent element
+                                parent = element.find_element(By.XPATH, "./..")
+                                parent_text = parent.text
+                                road = self._extract_road_from_text(parent_text)
+                                
+                                # Check siblings or nearby elements
+                                if not road:
+                                    siblings = parent.find_elements(By.XPATH, "./*")
+                                    for sibling in siblings[:5]:  # Check first 5 siblings
+                                        sibling_text = sibling.text
+                                        road = self._extract_road_from_text(sibling_text)
+                                        if road:
+                                            break
+                                            
+                            except:
+                                pass
+                        
+                        # If we found a monitored road, create flitser entry
+                        if road and road in MONITORED_ROADS:
+                            print(f"Found flitser on monitored road: {road}")
+                            
+                            location = self._extract_camera_location(element_text)
+                            direction = f"richting onbekend"
+                            flitser_type = "Mobiele flitser"
+                            is_active = True
+                            
+                            # Try to get more details from the full context
+                            try:
+                                full_context = element.find_element(By.XPATH, "./ancestor::*[5]").text
+                                direction, _, _ = self._extract_detailed_direction_and_locations(full_context, [])
+                                flitser_type, is_active = self._extract_flitser_type_and_status(full_context)
+                            except:
+                                pass
+                            
+                            flitser_data = {
+                                'id': f"flitser_{road}_{int(time.time())}_{idx}",
+                                'road': road,
+                                'location': location,
+                                'direction': direction,
+                                'flitser_type': flitser_type,
+                                'is_active': is_active,
+                                'last_updated': datetime.now()
+                            }
+                            
+                            speed_cameras.append(flitser_data)
+                            print(f"Added flitser: {road} - {flitser_type}")
+                        else:
+                            print(f"No monitored road found for element: '{element_text}' (road: {road})")
+                            
+                    except Exception as e:
+                        print(f"Error processing flitser element {idx}: {e}")
+                        continue
+                        
+            except Exception as e:
+                print(f"Error searching for flitser elements: {e}")
+                
+        except Exception as e:
+            print(f"Error in fast flitser extraction: {e}")
+        
+        print(f"Fast flitser extraction complete: {len(speed_cameras)} flitsers found")
+        return speed_cameras
+
     def _extract_traffic_jams(self, soup: BeautifulSoup) -> List[Dict]:
         """Legacy extraction method - kept as backup"""
         traffic_jams = []
