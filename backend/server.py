@@ -125,20 +125,14 @@ class ANWBScraper:
             except:
                 print("Timeout waiting for traffic data, proceeding with available content")
             
-            # Get the page source and parse with BeautifulSoup
-            html_content = self.driver.page_source
-            soup = BeautifulSoup(html_content, 'html.parser')
+            # Wait a bit more to ensure all content is loaded
+            time.sleep(3)
             
-            # Save HTML for debugging
-            with open('/tmp/anwb_selenium_debug.html', 'w', encoding='utf-8') as f:
-                f.write(html_content)
-            print(f"Saved Selenium HTML to /tmp/anwb_selenium_debug.html")
-            
-            # Extract traffic jams
-            traffic_jams = self._extract_traffic_jams(soup)
+            # Extract traffic jams by expanding each accordion
+            traffic_jams = self._extract_detailed_traffic_jams()
             
             # Extract speed cameras (placeholder for now)
-            speed_cameras = self._extract_speed_cameras(soup)
+            speed_cameras = []
             
             return {
                 'traffic_jams': traffic_jams,
