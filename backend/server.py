@@ -63,10 +63,71 @@ class TrafficResponse(BaseModel):
 # Configuration
 TARGET_ROADS = ["A2", "A16", "A50", "A58", "A59", "A65", "A67", "A73", "A76", "A270", "N2", "N69", "N266", "N270", "N279"]
 TARGET_CITIES = [
+    # Original cities
     "Eindhoven", "Venlo", "Weert", "'s-Hertogenbosch", "Roermond", "Maasbracht",
     "Nijmegen", "Oss", "Zonzeel", "Breda", "Tilburg", "Rotterdam", "Deurne",
     "Helmond", "Venray", "Heerlen", "Maastricht", "Belgische Grens", "Duitse Grens", 
-    "Valkenswaard", "Zevenbergschen Hoek", "Moerdijkbrug", "Culemborg"
+    "Valkenswaard", "Moerdijkbrug", "Culemborg",
+    
+    # A2 exits (Utrecht – 's-Hertogenbosch – Eindhoven – Maastricht)
+    "Utrecht-Centrum", "Nieuwegein", "Nieuwegein-Zuid", "Vianen", "Everdingen", 
+    "Beesd", "Geldermalsen", "Waardenburg", "Zaltbommel", "Kerkdriel", "Rosmalen",
+    "Veghel", "St. Michielsgestel", "Vught", "'s-Hertogenbosch-Centrum", "Boxtel-Noord", 
+    "Boxtel", "Best-West", "Best", "Eindhoven-Airport", "Eindhoven-Centrum", 
+    "Meerhoven-Zuid", "Veldhoven", "Veldhoven-Zuid", "High Tech Campus", "Waalre",
+    "Leende", "Maarheeze", "Budel", "Weert-Noord", "Nederweert", "Kelpen-Oler",
+    "Grathem", "Wessem", "St. Joost", "Echt", "Roosteren", "Born", "Urmond",
+    "Elsloo", "Ulestraten", "Meerssen", "Maastricht-Noord", "Maastricht-Centrum Noord",
+    "Maastricht-Centrum Zuid", "Maastricht-Zuid", "Gronsveld", "Oost-Maarland", "Eijsden",
+    
+    # A16 exits (Belgische Grens – Breda – Rotterdam)
+    "Rotterdam-Prins Alexander", "Rotterdam-Kralingen", "Capelle aan den IJssel",
+    "Rotterdam-Feijenoord", "Hendrik-Ido-Ambacht", "Zwijndrecht", "Dordrecht-Centrum",
+    "Dordrecht", "Dordrecht-Willemsdorp", "Zevenbergschen Hoek", "Breda-Noord",
+    "Breda-West", "Princeville", "Industrie Breda 6000-7000",
+    
+    # A50 exits (Eindhoven – Oss – Arnhem)
+    "Industrie Ekkersrijt", "Son en Breugel", "St. Oedenrode", "Eerde", "Veghel-Noord",
+    "Volkel", "Zeeland", "Nistelrode", "Ravenstein", "Valburg", "Heteren", "Renkum",
+    
+    # A58 exits (Eindhoven – Tilburg – Breda)
+    "Oirschot", "Moergestel", "Tilburg-Centrum-Oost", "Tilburg-Centrum-West",
+    "Tilburg-Reeshof", "Bavel", "Ulvenhout",
+    
+    # A59 exits (Zonzeel – 's-Hertogenbosch – Oss)
+    "Terheijden", "Made", "Oosterhout", "Raamsdonksveer", "Waspik", "Sprang-Capelle-West",
+    "Waalwijk", "Waalwijk-Centrum", "Waalwijk-Oost", "Drunen-West", "Heusden", 
+    "Nieuwkuijk", "Vlijmen", "Ring 's-Hertogenbosch-West", "Engelen", 
+    "'s-Hertogenbosch-Maaspoort", "Rosmalen-Oost", "Kruisstraat", "Nuland", "Oss-Oost",
+    
+    # A65 exits ('s-Hertogenbosch – Tilburg)
+    "Vught-Centrum", "Vught-Zuid", "Helvoirt", "Haaren", "Biezenmortel", "Udenhout",
+    "Berkel-Enschot", "Tilburg-Noord",
+    
+    # A67 exits (Belgische Grens – Eindhoven – Venlo – Duitse Grens)
+    "Hapert", "Eersel", "Geldrop", "Someren", "Asten", "Liessel", "Panningen",
+    "Venlo-Noordwest", "Noorderbrug", "Velden",
+    
+    # A73 exits (Nijmegen – Maasbracht)
+    "Beuningen", "Wijchen", "Nijmegen-Dukenburg", "Malden", "Cuijk", "Haps",
+    "Boxmeer", "Vierlingsbeek", "Venray-Noord", "Horst-Noord", "Horst", "Grubbenvorst",
+    "Venlo-West", "Maasbree", "Blerick", "Zuiderbrug", "Venlo-Zuid", "Belfeld",
+    "Beesel", "Roermond", "Roermond-Oost", "Linne",
+    
+    # A76 exits (Belgische Grens – Geleen – Heerlen – Duitse Grens)
+    "Stein", "Geleen", "Spaubeek", "Nuth", "Heerlen-Noord", "Simpelveld",
+    
+    # Junctions (Knooppunten)
+    "Knp. Oudenrijn", "Knp. Everdingen", "Knp. Deil", "Knp. Empel", "Knp. Hintham",
+    "Knp. Ekkersweijer", "Knp. Batadorp", "Knp. De Hogt", "Knp. Leenderheide",
+    "Knp. Het Vonderen", "Knp. Kerensheide", "Knp. Kruisdonk", "Knp. Terbregseplein",
+    "Knp. Ridderkerk", "Knp. Klaverpolder", "Knp. Galder", "Knp. Paalgraven",
+    "Knp. Bankhoef", "Knp. Ewijk", "Knp. Grijsoord", "Knp. De Baars", "Knp. St. Annabosch",
+    "Knp. Hooipolder", "Knp. Vught", "Knp. Zaarderheiken", "Knp. Neerbosch",
+    "Knp. Rijkevoort", "Knp. Tiglia", "Knp. Ten Esschen", "Knp. Kunderberg",
+    
+    # Bridges and Tunnels
+    "Van Brienenoordbrug", "Drechttunnel", "Tacitusbrug", "Swalmentunnel", "Roertunnel"
 ]
 
 class ANWBScraper:
