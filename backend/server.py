@@ -309,22 +309,19 @@ async def manual_scrape():
 
 @app.get("/api/traffic-jams")
 async def get_traffic_jams(
-    road: Optional[str] = None,
     city: Optional[str] = None,
     min_delay: Optional[int] = None
 ):
-    """Get traffic jams with optional filtering"""
+    """Get traffic jams with optional filtering - roads are pre-filtered to target list"""
     
-    # Build query
+    # Build query - roads are already filtered during scraping
     query = {}
-    if road:
-        query["road"] = road
     if city:
         query["city"] = city
     if min_delay is not None:
         query["delay_minutes"] = {"$gte": min_delay}
     
-    # Get traffic jams
+    # Get traffic jams (already filtered to target roads during scraping)
     cursor = db.traffic_jams.find(query)
     traffic_jams = []
     
@@ -335,7 +332,9 @@ async def get_traffic_jams(
     return {
         "traffic_jams": traffic_jams,
         "count": len(traffic_jams),
-        "filters": {"road": road, "city": city, "min_delay": min_delay}
+        "filters": {"city": city, "min_delay": min_delay},
+        "monitored_roads": TARGET_ROADS,
+        "monitored_cities": TARGET_CITIES
     }
 
 @app.get("/api/speed-cameras")
