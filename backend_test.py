@@ -502,6 +502,7 @@ def main():
         tester.test_traffic_endpoint,
         tester.test_traffic_jam_data_structure,
         tester.test_a67_traffic_jam,
+        tester.test_a270_traffic_jam,  # Added A270 specific test
         tester.test_roads_endpoint,
         tester.test_cities_endpoint,
         tester.test_refresh_endpoint,
