@@ -428,9 +428,9 @@ function App() {
                       🚨
                     </div>
                     <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Vaste Flitsers</p>
+                      <p className="text-sm font-medium text-gray-600">Actieve Flitsers</p>
                       <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.speed_cameras.filter(cam => cam.camera_type === 'Vaste flitser').length}
+                        {trafficData.speed_cameras.filter(cam => cam.is_active).length}
                       </p>
                     </div>
                   </div>
@@ -442,9 +442,9 @@ function App() {
                       🛣️
                     </div>
                     <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Trajectcontroles</p>
+                      <p className="text-sm font-medium text-gray-600">Mobiele Flitsers</p>
                       <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.speed_cameras.filter(cam => cam.camera_type === 'Trajectcontrole').length}
+                        {trafficData.speed_cameras.filter(cam => cam.flitser_type === 'Mobiele flitser').length}
                       </p>
                     </div>
                   </div>
