@@ -895,15 +895,38 @@ class ANWBScraper:
     def _extract_flitser_details(self, element, idx: int) -> Dict:
         """Extract details from a dynamic flitser element"""
         try:
-            text_content = element.text.strip()
+            # Get text content with better error handling
+            try:
+                text_content = element.text.strip()
+            except Exception as e:
+                print(f"Error getting text from element {idx}: {e}")
+                return None
             
-            if not text_content or len(text_content) < 5:
+            if not text_content or len(text_content) < 3:
+                print(f"Flitser element {idx} has no meaningful text: '{text_content}'")
                 return None
             
             print(f"Processing flitser element {idx}: {text_content}")
             
-            # Extract road information
+            # Extract road information with better patterns
             road = self._extract_road_from_text(text_content)
+            
+            # If no road found in text, try to find it in parent elements or nearby elements
+            if not road:
+                try:
+                    parent = element.find_element(By.XPATH, "./..")
+                    parent_text = parent.text.strip()
+                    road = self._extract_road_from_text(parent_text)
+                    print(f"Found road in parent: {road}")
+                except:
+                    pass
+            
+            # Only process if we found a monitored road
+            if not road or road not in MONITORED_ROADS:
+                print(f"No monitored road found for flitser element {idx}, road: {road}")
+                return None
+            
+            print(f"Found monitored road: {road}")
             
             # Extract location and direction
             location = self._extract_camera_location(text_content)
@@ -912,19 +935,22 @@ class ANWBScraper:
             # Determine flitser type and activity status
             flitser_type, is_active = self._extract_flitser_type_and_status(text_content)
             
-            if road and road in MONITORED_ROADS:
-                return {
-                    'id': f"flitser_{road}_{int(time.time())}_{idx}",
-                    'road': road,
-                    'location': location,
-                    'direction': direction,
-                    'flitser_type': flitser_type,
-                    'is_active': is_active,
-                    'last_updated': datetime.now()
-                }
+            # Create flitser data
+            flitser_data = {
+                'id': f"flitser_{road}_{int(time.time())}_{idx}",
+                'road': road,
+                'location': location,
+                'direction': direction,
+                'flitser_type': flitser_type,
+                'is_active': is_active,
+                'last_updated': datetime.now()
+            }
+            
+            print(f"Created flitser data: {flitser_data}")
+            return flitser_data
                 
         except Exception as e:
-            print(f"Error extracting flitser details: {e}")
+            print(f"Error extracting flitser details for element {idx}: {e}")
         
         return None
 
