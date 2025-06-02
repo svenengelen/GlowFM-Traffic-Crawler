@@ -16,20 +16,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    road: '', // Will use all roads by default
-    city: '', // Will use all cities by default
+    road: '', // All roads by default
+    city: '', // All cities by default  
     minDelay: ''
   });
-  const [monitoredRoads, setMonitoredRoads] = useState([]);
-  const [monitoredCities, setMonitoredCities] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || import.meta.env.REACT_APP_BACKEND_URL;
-
-  // Fetch monitored roads and cities on component mount
-  useEffect(() => {
-    fetchMonitoredData();
-  }, []);
 
   // Fetch traffic data when filters change
   useEffect(() => {
@@ -42,32 +35,13 @@ function App() {
     return () => clearInterval(interval);
   }, [filters]);
 
-  const fetchMonitoredData = async () => {
-    try {
-      const [roadsResponse, citiesResponse] = await Promise.all([
-        fetch(`${backendUrl}/api/roads`),
-        fetch(`${backendUrl}/api/cities`)
-      ]);
-
-      if (roadsResponse.ok && citiesResponse.ok) {
-        const roadsData = await roadsResponse.json();
-        const citiesData = await citiesResponse.json();
-        setMonitoredRoads(roadsData.roads);
-        setMonitoredCities(citiesData.cities);
-      }
-    } catch (err) {
-      console.error('Error fetching monitored data:', err);
-    }
-  };
-
   const fetchTrafficData = async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams();
-      if (filters.road) params.append('road', filters.road);
-      if (filters.city) params.append('city', filters.city);
+      // Always use all roads and cities - no filtering by road/city
       if (filters.minDelay) params.append('min_delay', filters.minDelay);
 
       const response = await fetch(`${backendUrl}/api/traffic?${params.toString()}`);
@@ -147,8 +121,8 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">🚗 ANWB Verkeersmonitor</h1>
-              <p className="text-blue-100 mt-2">Realtime verkeersinformatie uit Nederland</p>
+              <h1 className="text-3xl font-bold">📻 Glow FM Verkeer</h1>
+              <p className="text-blue-100 mt-2">Staan er files rondom Eindhoven?</p>
             </div>
             <div className="text-right">
               <div className="text-sm text-blue-100">Laatst bijgewerkt</div>
@@ -159,34 +133,6 @@ function App() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Tabs */}
-        <div className="mb-8">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('traffic')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'traffic'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🚦 Verkeersinformatie
-              </button>
-              <button
-                onClick={() => setActiveTab('cameras')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'cameras'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                📷 Flitspalen
-              </button>
-            </nav>
-          </div>
-        </div>
-
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -208,39 +154,9 @@ function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Road Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Weg</label>
-              <select
-                value={filters.road}
-                onChange={(e) => handleFilterChange('road', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Alle Wegen</option>
-                {monitoredRoads.map(road => (
-                  <option key={road} value={road}>{road}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* City Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Stad</label>
-              <select
-                value={filters.city}
-                onChange={(e) => handleFilterChange('city', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Alle Steden</option>
-                {monitoredCities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Delay Filter */}
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            {/* Only Delay Filter */}
+            <div className="max-w-md">
               <label className="block text-sm font-medium text-gray-700 mb-2">Minimale Vertraging</label>
               <select
                 value={filters.minDelay}
@@ -269,281 +185,225 @@ function App() {
           </div>
         )}
 
-        {/* Traffic Jams Tab */}
-        {activeTab === 'traffic' && (
-          <div>
-            {/* Traffic Stats */}
-            {trafficData && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-blue-100 text-blue-600">
-                      🚦
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Totaal Files</p>
-                      <p className="text-2xl font-semibold text-gray-900">{trafficData.total_jams}</p>
-                    </div>
-                  </div>
+        {/* Traffic Stats */}
+        {trafficData && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                  🚦
                 </div>
-
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
-                      ⏱️
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Gem. Vertraging</p>
-                      <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.traffic_jams.length > 0
-                          ? Math.round(trafficData.traffic_jams.reduce((sum, jam) => sum + jam.delay_minutes, 0) / trafficData.traffic_jams.length)
-                          : 0}
-                        <span className="text-sm text-gray-500"> min</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-red-100 text-red-600">
-                      📏
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Totale Lengte</p>
-                      <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.traffic_jams.reduce((sum, jam) => sum + jam.length_km, 0).toFixed(1)}
-                        <span className="text-sm text-gray-500"> km</span>
-                      </p>
-                    </div>
-                  </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Totaal Files</p>
+                  <p className="text-2xl font-semibold text-gray-900">{trafficData.total_jams}</p>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Traffic Jams List */}
-            <div className="bg-white rounded-lg shadow-md">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Verkeersinformatie</h3>
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-yellow-100 text-yellow-600">
+                  ⏱️
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Gem. Vertraging</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {trafficData.traffic_jams.length > 0
+                      ? Math.round(trafficData.traffic_jams.reduce((sum, jam) => sum + jam.delay_minutes, 0) / trafficData.traffic_jams.length)
+                      : 0}
+                    <span className="text-sm text-gray-500"> min</span>
+                  </p>
+                </div>
               </div>
-              
-              {loading && (
-                <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Verkeersinformatie laden...</p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center">
+                <div className="p-3 rounded-full bg-green-100 text-green-600">
+                  🛣️
                 </div>
-              )}
-
-              {!loading && trafficData && trafficData.traffic_jams.length === 0 && (
-                <div className="p-8 text-center">
-                  <div className="text-green-500 text-4xl mb-4">✅</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Geen Files</h3>
-                  <p className="text-gray-600">Goed nieuws! Geen files gevonden die voldoen aan uw criteria.</p>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Mobiele Flitsers</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {trafficData.speed_cameras.filter(cam => cam.flitser_type === 'Mobiele flitser').length}
+                  </p>
                 </div>
-              )}
-
-              {!loading && trafficData && trafficData.traffic_jams.length > 0 && (
-                <div className="divide-y divide-gray-200">
-                  {trafficData.traffic_jams.map((jam, index) => (
-                    <div key={jam.id || index} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(jam.road)}`}>
-                              {jam.road}
-                            </span>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${getDelayColor(jam.delay_minutes)}`}>
-                              +{jam.delay_minutes} min
-                            </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              {jam.length_km} km
-                            </span>
-                          </div>
-
-                          {/* Direction and Locations */}
-                          {jam.direction && jam.direction !== 'Onbekende richting' && (
-                            <p className="text-sm text-blue-600 font-medium mb-1">
-                              📍 {jam.direction}
-                            </p>
-                          )}
-
-                          {/* Route Details */}
-                          {jam.route_details && jam.route_details !== 'Route onbekend' && (
-                            <p className="text-sm text-gray-700 mb-1">
-                              🛣️ {jam.route_details}
-                            </p>
-                          )}
-
-                          {/* Source and Destination */}
-                          {(jam.source_location && jam.destination_location && 
-                            jam.source_location !== 'Onbekend' && jam.destination_location !== 'Onbekend') && (
-                            <p className="text-sm text-gray-600 mb-1">
-                              📍 Van {jam.source_location} naar {jam.destination_location}
-                            </p>
-                          )}
-
-                          {/* Detailed Cause */}
-                          {jam.cause && jam.cause !== 'Oorzaak onbekend' && (
-                            <p className="text-sm text-orange-600 mb-1 italic">
-                              ⚠️ {jam.cause}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ml-4 text-right">
-                          <p className="text-xs text-gray-500">
-                            Bijgewerkt: {new Date(jam.last_updated).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           </div>
         )}
 
-        {/* Speed Cameras Tab */}
-        {activeTab === 'cameras' && (
-          <div>
-            {/* Speed Camera Stats */}
-            {trafficData && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-orange-100 text-orange-600">
-                      📷
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Totaal Flitspalen</p>
-                      <p className="text-2xl font-semibold text-gray-900">{trafficData.speed_cameras.length}</p>
-                    </div>
-                  </div>
-                </div>
+        {/* Files Section */}
+        <div className="bg-white rounded-lg shadow-md mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">🚦 Files</h3>
+          </div>
+          
+          {loading && (
+            <div className="p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Files laden...</p>
+            </div>
+          )}
 
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-purple-100 text-purple-600">
-                      🚨
+          {!loading && trafficData && trafficData.traffic_jams.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="text-green-500 text-4xl mb-4">✅</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Geen Files</h3>
+              <p className="text-gray-600">Goed nieuws! Geen files gevonden rondom Eindhoven.</p>
+            </div>
+          )}
+
+          {!loading && trafficData && trafficData.traffic_jams.length > 0 && (
+            <div className="divide-y divide-gray-200">
+              {trafficData.traffic_jams.map((jam, index) => (
+                <div key={jam.id || index} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(jam.road)}`}>
+                          {jam.road}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${getDelayColor(jam.delay_minutes)}`}>
+                          +{jam.delay_minutes} min
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          {jam.length_km} km
+                        </span>
+                      </div>
+
+                      {/* Direction and Locations */}
+                      {jam.direction && jam.direction !== 'Onbekende richting' && (
+                        <p className="text-sm text-blue-600 font-medium mb-1">
+                          📍 {jam.direction}
+                        </p>
+                      )}
+
+                      {/* Route Details */}
+                      {jam.route_details && jam.route_details !== 'Route onbekend' && (
+                        <p className="text-sm text-gray-700 mb-1">
+                          🛣️ {jam.route_details}
+                        </p>
+                      )}
+
+                      {/* Source and Destination */}
+                      {(jam.source_location && jam.destination_location && 
+                        jam.source_location !== 'Onbekend' && jam.destination_location !== 'Onbekend') && (
+                        <p className="text-sm text-gray-600 mb-1">
+                          📍 Van {jam.source_location} naar {jam.destination_location}
+                        </p>
+                      )}
+
+                      {/* Detailed Cause */}
+                      {jam.cause && jam.cause !== 'Oorzaak onbekend' && (
+                        <p className="text-sm text-orange-600 mb-1 italic">
+                          ⚠️ {jam.cause}
+                        </p>
+                      )}
                     </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Actieve Flitsers</p>
-                      <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.speed_cameras.filter(cam => cam.is_active).length}
+                    <div className="ml-4 text-right">
+                      <p className="text-xs text-gray-500">
+                        Bijgewerkt: {new Date(jam.last_updated).toLocaleTimeString()}
                       </p>
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 rounded-full bg-green-100 text-green-600">
-                      🛣️
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Mobiele Flitsers</p>
-                      <p className="text-2xl font-semibold text-gray-900">
-                        {trafficData.speed_cameras.filter(cam => cam.flitser_type === 'Mobiele flitser').length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+        {/* Flitsers Section */}
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">📷 Flitsers</h3>
+          </div>
+          
+          {loading && (
+            <div className="p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Flitser informatie laden...</p>
+            </div>
+          )}
 
-            {/* Speed Cameras List */}
-            <div className="bg-white rounded-lg shadow-md">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Flitspalen</h3>
-              </div>
-              
-              {loading && (
-                <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Flitspaal informatie laden...</p>
-                </div>
-              )}
+          {!loading && trafficData && trafficData.speed_cameras.length === 0 && (
+            <div className="p-8 text-center">
+              <div className="text-blue-500 text-4xl mb-4">📷</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Geen Flitsers</h3>
+              <p className="text-gray-600">Geen actieve flitsers gevonden rondom Eindhoven.</p>
+            </div>
+          )}
 
-              {!loading && trafficData && trafficData.speed_cameras.length === 0 && (
-                <div className="p-8 text-center">
-                  <div className="text-blue-500 text-4xl mb-4">📷</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Geen Flitspalen</h3>
-                  <p className="text-gray-600">Geen flitspalen gevonden die voldoen aan uw criteria.</p>
-                </div>
-              )}
+          {!loading && trafficData && trafficData.speed_cameras.length > 0 && (
+            <div className="divide-y divide-gray-200">
+              {trafficData.speed_cameras.map((camera, index) => (
+                <div key={camera.id || index} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(camera.road)}`}>
+                          {camera.road}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          camera.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {camera.flitser_type}
+                        </span>
+                        {camera.is_active && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            ACTIEF
+                          </span>
+                        )}
+                      </div>
 
-              {!loading && trafficData && trafficData.speed_cameras.length > 0 && (
-                <div className="divide-y divide-gray-200">
-                  {trafficData.speed_cameras.map((camera, index) => (
-                    <div key={camera.id || index} className="p-6 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(camera.road)}`}>
-                              {camera.road}
-                            </span>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              camera.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
-                              {camera.flitser_type}
-                            </span>
-                            {camera.is_active && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                ACTIEF
-                              </span>
-                            )}
-                          </div>
+                      {/* Location */}
+                      {camera.location && camera.location !== 'Locatie onbekend' && (
+                        <p className="text-sm text-gray-700 mb-1">
+                          📍 {camera.location}
+                        </p>
+                      )}
 
-                          {/* Location */}
-                          {camera.location && camera.location !== 'Locatie onbekend' && (
-                            <p className="text-sm text-gray-700 mb-1">
-                              📍 {camera.location}
-                            </p>
-                          )}
+                      {/* Direction */}
+                      {camera.direction && camera.direction !== 'Onbekende richting' && (
+                        <p className="text-sm text-blue-600 mb-1">
+                          🧭 {camera.direction}
+                        </p>
+                      )}
 
-                          {/* Direction */}
-                          {camera.direction && camera.direction !== 'Onbekende richting' && (
-                            <p className="text-sm text-blue-600 mb-1">
-                              🧭 {camera.direction}
-                            </p>
-                          )}
-
-                          {/* Flitser Type Details */}
-                          <div className="flex items-center space-x-4 mt-2">
-                            {camera.flitser_type === 'Mobiele flitser' && (
-                              <span className="text-xs text-gray-500">🚐 Mobiele snelheidscontrole</span>
-                            )}
-                            {camera.flitser_type === 'Actieve flitser' && (
-                              <span className="text-xs text-gray-500">📷 Actieve flitspaal</span>
-                            )}
-                            {camera.flitser_type === 'Snelheidscontrole' && (
-                              <span className="text-xs text-gray-500">🚨 Dynamische snelheidscontrole</span>
-                            )}
-                            {camera.is_active && (
-                              <span className="text-xs text-green-600 font-medium">🟢 Momenteel actief</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-4 text-right">
-                          <p className="text-xs text-gray-500">
-                            Bijgewerkt: {new Date(camera.last_updated).toLocaleTimeString()}
-                          </p>
-                        </div>
+                      {/* Flitser Type Details */}
+                      <div className="flex items-center space-x-4 mt-2">
+                        {camera.flitser_type === 'Mobiele flitser' && (
+                          <span className="text-xs text-gray-500">🚐 Mobiele snelheidscontrole</span>
+                        )}
+                        {camera.flitser_type === 'Actieve flitser' && (
+                          <span className="text-xs text-gray-500">📷 Actieve flitspaal</span>
+                        )}
+                        {camera.flitser_type === 'Snelheidscontrole' && (
+                          <span className="text-xs text-gray-500">🚨 Dynamische snelheidscontrole</span>
+                        )}
+                        {camera.is_active && (
+                          <span className="text-xs text-green-600 font-medium">🟢 Momenteel actief</span>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    <div className="ml-4 text-right">
+                      <p className="text-xs text-gray-500">
+                        Bijgewerkt: {new Date(camera.last_updated).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-8 mt-16">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-gray-300">
-            Verkeersinformatie via ANWB • Updates elke 5 minuten • Gemaakt met ❤️ voor veiliger reizen
+            Verkeersinfo vanuit de ANWB. Problemen? Contact team techniek!
           </p>
         </div>
       </footer>
