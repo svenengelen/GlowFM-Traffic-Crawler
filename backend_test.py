@@ -327,6 +327,134 @@ class ANWBTrafficTester:
                 
             return True
         return False
+        
+    def test_speed_cameras_endpoint(self):
+        """Test the dedicated speed cameras endpoint"""
+        success, response = self.run_test(
+            "Speed Cameras Endpoint",
+            "GET",
+            "speed-cameras",
+            200
+        )
+        if success:
+            if 'speed_cameras' in response and 'total_cameras' in response and 'last_updated' in response:
+                print(f"✅ Speed cameras endpoint returns data with {response['total_cameras']} cameras")
+                return True
+            else:
+                print(f"❌ Speed cameras endpoint returns unexpected format: {response}")
+                return False
+        return success
+        
+    def test_speed_cameras_in_traffic_endpoint(self):
+        """Test that speed cameras are included in the traffic endpoint response"""
+        success, response = self.run_test(
+            "Speed Cameras in Traffic Endpoint",
+            "GET",
+            "traffic",
+            200
+        )
+        if success:
+            if 'speed_cameras' in response:
+                print(f"✅ Traffic endpoint includes speed cameras array with {len(response['speed_cameras'])} cameras")
+                return True
+            else:
+                print(f"❌ Traffic endpoint does not include speed cameras")
+                return False
+        return success
+        
+    def test_speed_camera_data_structure(self):
+        """Test that speed camera objects have the expected data structure"""
+        success, response = self.run_test(
+            "Speed Camera Data Structure",
+            "GET",
+            "speed-cameras",
+            200
+        )
+        if success:
+            if 'speed_cameras' in response:
+                speed_cameras = response['speed_cameras']
+                if not speed_cameras:
+                    print("ℹ️ No speed cameras found - cannot verify data structure")
+                    return True
+                
+                # Check first speed camera for all expected fields
+                first_camera = speed_cameras[0]
+                missing_fields = [field for field in self.expected_speed_camera_fields if field not in first_camera]
+                
+                if not missing_fields:
+                    print(f"✅ Speed camera has all expected fields: {', '.join(self.expected_speed_camera_fields)}")
+                    
+                    # Check that camera_type is one of the expected types
+                    camera_type = first_camera.get('camera_type', '')
+                    if camera_type in self.expected_camera_types:
+                        print(f"✅ Camera type is valid: {camera_type}")
+                    else:
+                        print(f"❌ Unexpected camera type: {camera_type}")
+                        print(f"Expected one of: {', '.join(self.expected_camera_types)}")
+                        return False
+                    
+                    # Check that speed_limit is a reasonable value
+                    speed_limit = first_camera.get('speed_limit', 0)
+                    if isinstance(speed_limit, int) and 0 <= speed_limit <= 130:
+                        print(f"✅ Speed limit is valid: {speed_limit} km/h")
+                    else:
+                        print(f"❌ Unexpected speed limit value: {speed_limit}")
+                        return False
+                    
+                    print(f"Sample speed camera: {json.dumps(first_camera, indent=2, default=str)}")
+                    return True
+                else:
+                    print(f"❌ Speed camera missing expected fields: {', '.join(missing_fields)}")
+                    print(f"Available fields: {', '.join(first_camera.keys())}")
+                    return False
+            else:
+                print(f"❌ Speed cameras endpoint returns unexpected format: {response}")
+                return False
+        return success
+        
+    def test_speed_camera_filtering(self):
+        """Test speed camera filtering by road and city"""
+        # Test road filter
+        road_to_test = self.expected_roads[0]  # Use first road as test
+        success, response = self.run_test(
+            f"Speed Camera Filtering by Road ({road_to_test})",
+            "GET",
+            "speed-cameras",
+            200,
+            params={"road": road_to_test}
+        )
+        if success and 'speed_cameras' in response:
+            speed_cameras = response['speed_cameras']
+            if speed_cameras:
+                if all(cam['road'] == road_to_test for cam in speed_cameras):
+                    print(f"✅ Road filtering works correctly, found {len(speed_cameras)} {road_to_test} cameras")
+                else:
+                    print(f"❌ Road filtering returned non-{road_to_test} cameras")
+                    return False
+            else:
+                print(f"ℹ️ No {road_to_test} speed cameras found - filter works but no matching data")
+        else:
+            return False
+
+        # Test city filter
+        city_to_test = self.expected_cities[0]  # Use first city as test
+        success, response = self.run_test(
+            f"Speed Camera Filtering by City ({city_to_test})",
+            "GET",
+            "speed-cameras",
+            200,
+            params={"city": city_to_test}
+        )
+        if success and 'speed_cameras' in response:
+            speed_cameras = response['speed_cameras']
+            if speed_cameras:
+                print(f"✅ City filtering returned {len(speed_cameras)} cameras for {city_to_test}")
+            else:
+                print(f"ℹ️ No speed cameras found for {city_to_test} - filter works but no matching data")
+        else:
+            return False
+
+        return True
 
 def main():
     # Setup
