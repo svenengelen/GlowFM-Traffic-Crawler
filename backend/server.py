@@ -646,79 +646,130 @@ class ANWBScraper:
         try:
             print("Starting dynamic flitsers extraction...")
             
+            # Check if driver is still alive
+            if not self.driver:
+                print("No driver available for flitser extraction")
+                return speed_cameras
+            
+            try:
+                # Test driver connectivity
+                current_url = self.driver.current_url
+                print(f"Driver connected, current URL: {current_url}")
+            except Exception as e:
+                print(f"Driver connection test failed: {e}")
+                return speed_cameras
+            
             # First, try to enable the "Flitsers" checkbox to show dynamic speed cameras
             try:
-                # Look for flitsers checkbox or toggle
-                flitsers_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Flitser') or contains(text(), 'flitser')]")
+                # Look for flitsers checkbox or toggle - be more specific
+                print("Looking for flitsers toggle...")
                 
-                if flitsers_elements:
-                    print(f"Found {len(flitsers_elements)} flitser-related elements")
-                    for element in flitsers_elements:
+                # Try multiple approaches to find flitser toggle
+                flitser_found = False
+                
+                # Approach 1: Look for checkbox inputs
+                try:
+                    checkboxes = self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
+                    for checkbox in checkboxes:
                         try:
-                            # Try to click the element or its parent to enable flitsers
-                            self.driver.execute_script("arguments[0].click();", element)
-                            print(f"Clicked flitser element: {element.text[:50]}")
-                            time.sleep(2)
-                            break
+                            parent = checkbox.find_element(By.XPATH, "./..")
+                            if 'flits' in parent.text.lower():
+                                print(f"Found flitser checkbox: {parent.text}")
+                                if not checkbox.is_selected():
+                                    self.driver.execute_script("arguments[0].click();", checkbox)
+                                    print("Enabled flitser checkbox")
+                                    time.sleep(2)
+                                flitser_found = True
+                                break
                         except:
                             continue
-                else:
-                    print("No flitser toggle elements found")
+                except Exception as e:
+                    print(f"Checkbox approach failed: {e}")
+                
+                # Approach 2: Look for labels containing "flits"
+                if not flitser_found:
+                    try:
+                        labels = self.driver.find_elements(By.TAG_NAME, "label")
+                        for label in labels:
+                            if 'flits' in label.text.lower():
+                                print(f"Found flitser label: {label.text}")
+                                self.driver.execute_script("arguments[0].click();", label)
+                                print("Clicked flitser label")
+                                time.sleep(2)
+                                flitser_found = True
+                                break
+                    except Exception as e:
+                        print(f"Label approach failed: {e}")
+                
+                if not flitser_found:
+                    print("No flitser toggle found, proceeding with available data")
                 
             except Exception as e:
                 print(f"Error enabling flitsers: {e}")
             
-            # Now look for dynamic flitser data
+            # Now look for flitser data in the page
             try:
-                # Search for flitser-specific elements in the page
-                flitser_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'flitser') or contains(text(), 'Flitser') or contains(@class, 'flitser') or contains(@class, 'speed')]")
+                print("Searching for flitser data...")
                 
-                print(f"Found {len(flitser_elements)} potential flitser elements")
+                # Check if driver is still alive before proceeding
+                try:
+                    page_source_length = len(self.driver.page_source)
+                    print(f"Page source available, length: {page_source_length}")
+                except Exception as e:
+                    print(f"Cannot access page source: {e}")
+                    return speed_cameras
                 
-                # Also check road articles for flitser information
-                road_articles = self.driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
+                # Look for any elements containing flitser information
+                flitser_elements = []
                 
-                for article in road_articles:
+                # Try different selectors to find flitser elements
+                selectors_to_try = [
+                    "//*[contains(text(), 'flitser')]",
+                    "//*[contains(text(), 'Flitser')]", 
+                    "//*[contains(text(), 'camera')]",
+                    "//*[contains(text(), 'Camera')]",
+                    "//*[contains(@class, 'flitser')]",
+                    "//*[contains(@class, 'camera')]"
+                ]
+                
+                for selector in selectors_to_try:
                     try:
-                        road = article.get_attribute('data-accordion-road')
-                        if road and road in MONITORED_ROADS:
-                            
-                            # Click to expand the accordion to look for flitsers
-                            try:
-                                button = article.find_element(By.CSS_SELECTOR, "button[data-test-id='traffic-list-road-header']")
-                                self.driver.execute_script("arguments[0].click();", button)
-                                time.sleep(1)
-                                
-                                # Look for flitser information in the expanded content
-                                article_text = article.text.lower()
-                                if 'flitser' in article_text:
-                                    print(f"Found flitser reference in {road}")
-                                    
-                                    # Extract flitser details from this road
-                                    flitser_data = self._extract_flitser_from_road(article, road)
-                                    if flitser_data:
-                                        speed_cameras.append(flitser_data)
-                                        
-                            except Exception as e:
-                                print(f"Error processing road {road} for flitsers: {e}")
-                                continue
-                                
+                        elements = self.driver.find_elements(By.XPATH, selector)
+                        if elements:
+                            print(f"Found {len(elements)} elements with selector: {selector}")
+                            flitser_elements.extend(elements)
                     except Exception as e:
-                        print(f"Error checking road article for flitsers: {e}")
+                        print(f"Selector {selector} failed: {e}")
                         continue
                 
-                # Process standalone flitser elements
-                for idx, element in enumerate(flitser_elements):
+                # Remove duplicates
+                unique_elements = []
+                seen_texts = set()
+                for element in flitser_elements:
                     try:
+                        text = element.text.strip()
+                        if text and text not in seen_texts and len(text) > 3:
+                            unique_elements.append(element)
+                            seen_texts.add(text)
+                    except:
+                        continue
+                
+                print(f"Found {len(unique_elements)} unique flitser elements")
+                
+                # Process each flitser element
+                for idx, element in enumerate(unique_elements):
+                    try:
+                        print(f"Processing flitser element {idx}")
                         flitser_data = self._extract_flitser_details(element, idx)
                         if flitser_data:
                             speed_cameras.append(flitser_data)
+                            print(f"Successfully extracted flitser: {flitser_data}")
                     except Exception as e:
                         print(f"Error extracting flitser {idx}: {e}")
                         continue
                         
             except Exception as e:
-                print(f"Error extracting flitser elements: {e}")
+                print(f"Error searching for flitser data: {e}")
                 
         except Exception as e:
             print(f"Error in _extract_speed_cameras_detailed: {e}")
