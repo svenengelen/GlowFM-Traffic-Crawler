@@ -113,93 +113,96 @@ class ANWBScraper:
             # Add delay to be respectful
             time.sleep(2)
             
-            # For now, let's add some sample data to showcase the application
-            # We'll fix the actual scraping later
+            response = self.session.get("https://anwb.nl/verkeer/filelijst", timeout=30)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
             traffic_jams = []
             speed_cameras = []
             
-            # Sample traffic data based on the current ANWB website
-            sample_data = [
-                {
-                    "road": "A50",
-                    "location": "Eindhoven - 's-Hertogenbosch", 
-                    "delay_text": "+ 15 min",
-                    "length_text": "3 km"
-                },
-                {
-                    "road": "A73",
-                    "location": "Maasbracht - Nijmegen",
-                    "delay_text": "+ 8 min", 
-                    "length_text": "2 km"
-                },
-                {
-                    "road": "A2",
-                    "location": "Eindhoven - Weert",
-                    "delay_text": "+ 22 min",
-                    "length_text": "5 km"
-                },
-                {
-                    "road": "A58",
-                    "location": "Breda - Tilburg",
-                    "delay_text": "+ 12 min",
-                    "length_text": "4 km"
-                },
-                {
-                    "road": "A16",
-                    "location": "Rotterdam - Breda",
-                    "delay_text": "+ 30 min",
-                    "length_text": "8 km"
-                },
-                {
-                    "road": "A67",
-                    "location": "Eindhoven - Venlo",
-                    "delay_text": "+ 6 min",
-                    "length_text": "1 km"
-                },
-                {
-                    "road": "N2",
-                    "location": "Maastricht - Belgische Grens",
-                    "delay_text": "+ 18 min",
-                    "length_text": "6 km"
-                }
-            ]
+            # Find all road sections - they are in articles with data-test-id="traffic-list-road"
+            road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
+            logger.info(f"Found {len(road_articles)} road articles on ANWB website")
             
-            for data in sample_data:
-                traffic_jam = TrafficJam(
-                    road=data["road"],
-                    location=data["location"],
-                    delay_minutes=self.parse_delay(data["delay_text"]),
-                    delay_text=data["delay_text"],
-                    length_km=self.parse_length(data["length_text"]),
-                    length_text=data["length_text"]
-                )
-                traffic_jams.append(traffic_jam)
+            for i, article in enumerate(road_articles):
+                try:
+                    # Get road number from the span with data-test-id="traffic-list-road-road-number"
+                    road_number_elem = article.find('span', {'data-test-id': 'traffic-list-road-road-number'})
+                    if not road_number_elem:
+                        logger.debug(f"Article {i}: No road number element found")
+                        continue
+                        
+                    road = road_number_elem.get_text(strip=True)
+                    logger.debug(f"Article {i}: Found road {road}")
+                    
+                    # Only process roads we're interested in
+                    if road not in TARGET_ROADS:
+                        logger.debug(f"Article {i}: Road {road} not in target roads, skipping")
+                        continue
+                    
+                    logger.info(f"Processing target road: {road}")
+                    
+                    # Get location information from h3 element
+                    location_elem = article.find('h3')
+                    location = ""
+                    if location_elem:
+                        location = location_elem.get_text(strip=True)
+                        # Remove arrow symbols and clean up
+                        location = re.sub(r'[→←↑↓]', ' - ', location)
+                        location = re.sub(r'\s+', ' ', location).strip()
+                        logger.info(f"Road {road} location: '{location}'")
+                    
+                    # Get delay and length information
+                    delay_text = ""
+                    length_text = ""
+                    
+                    # Look for the div with traffic info (delay + length)
+                    traffic_info_div = article.find('div', {'data-test': 'body-text'})
+                    if traffic_info_div:
+                        spans = traffic_info_div.find_all('span')
+                        logger.debug(f"Road {road}: Found {len(spans)} spans in traffic info")
+                        
+                        for span in spans:
+                            text = span.get_text(strip=True)
+                            if 'min' in text:
+                                delay_text = text
+                            elif 'km' in text:
+                                length_text = text
+                    
+                    logger.info(f"Road {road}: delay='{delay_text}', length='{length_text}', location='{location}'")
+                    
+                    # Only create a traffic jam entry if we have meaningful information
+                    # Include roads from our target list even if no current delays (show as monitored)
+                    if location or delay_text or length_text:
+                        # Apply city filter if location is available
+                        if location and not self.city_matches_target(location):
+                            logger.debug(f"Road {road}: Location '{location}' doesn't match target cities, skipping")
+                            continue
+                        
+                        traffic_jam = TrafficJam(
+                            road=road,
+                            location=location or f"{road} - Monitored",
+                            delay_minutes=self.parse_delay(delay_text),
+                            delay_text=delay_text or "No current delays",
+                            length_km=self.parse_length(length_text),
+                            length_text=length_text or "N/A"
+                        )
+                        traffic_jams.append(traffic_jam)
+                        logger.info(f"Added traffic entry for {road}: {location}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing article {i}: {str(e)}")
+                    continue
             
-            # Sample speed cameras
-            camera_data = [
-                {"road": "A2", "location": "Eindhoven Zuid"},
-                {"road": "A50", "location": "'s-Hertogenbosch Noord"},
-                {"road": "A73", "location": "Venlo Centrum"},
-                {"road": "A58", "location": "Breda Oost"},
-                {"road": "N69", "location": "Valkenswaard"}
-            ]
-            
-            for data in camera_data:
-                camera = SpeedCamera(
-                    road=data["road"],
-                    location=data["location"]
-                )
-                speed_cameras.append(camera)
-            
-            # Store in database
+            # Clear old data and store new data
+            await db.traffic_jams.delete_many({})
             if traffic_jams:
-                # Clear old data (keep only current)
-                await db.traffic_jams.delete_many({})
                 await db.traffic_jams.insert_many([jam.dict() for jam in traffic_jams])
-                logger.info(f"Stored {len(traffic_jams)} traffic jams in database")
+                logger.info(f"Stored {len(traffic_jams)} traffic entries in database")
             
+            await db.speed_cameras.delete_many({})
             if speed_cameras:
-                await db.speed_cameras.delete_many({})
                 await db.speed_cameras.insert_many([cam.dict() for cam in speed_cameras])
                 logger.info(f"Stored {len(speed_cameras)} speed cameras in database")
             
@@ -210,7 +213,7 @@ class ANWBScraper:
                 upsert=True
             )
             
-            logger.info(f"Added sample data: {len(traffic_jams)} traffic jams and {len(speed_cameras)} speed cameras")
+            logger.info(f"Scraping completed: {len(traffic_jams)} traffic entries and {len(speed_cameras)} speed cameras")
             
         except Exception as e:
             logger.error(f"Error scraping ANWB data: {str(e)}")
