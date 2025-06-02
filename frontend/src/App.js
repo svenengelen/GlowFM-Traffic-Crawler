@@ -208,7 +208,7 @@ function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-lg shadow">
               <div className="p-6 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Verkeersfiles</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Files</h2>
               </div>
               <div className="divide-y divide-gray-200">
                 {trafficData.traffic_jams.length === 0 ? (
@@ -221,7 +221,7 @@ function App() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center space-x-3">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded ${getRoadStyle(jam.road)}`}>
                               {jam.road}
                             </span>
                             {jam.delay_minutes > 0 && (
