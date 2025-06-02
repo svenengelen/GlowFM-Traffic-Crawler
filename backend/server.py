@@ -85,7 +85,6 @@ class ANWBScraper:
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--disable-plugins")
         chrome_options.add_argument("--disable-images")
-        chrome_options.add_argument("--disable-javascript")
         chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         
         # Use system Chromium
