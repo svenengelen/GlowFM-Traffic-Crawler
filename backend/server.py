@@ -942,9 +942,10 @@ async def get_traffic_data(
             traffic_jams = [jam for jam in traffic_jams if jam['road'].upper() == road.upper()]
         
         if city:
-            traffic_jams = [jam for jam in traffic_jams if city.lower() in jam.get('from_exit', '').lower() or 
-                           city.lower() in jam.get('to_exit', '').lower() or 
-                           city.lower() in jam.get('direction', '').lower()]
+            traffic_jams = [jam for jam in traffic_jams if city.lower() in jam.get('source_location', '').lower() or 
+                           city.lower() in jam.get('destination_location', '').lower() or 
+                           city.lower() in jam.get('direction', '').lower() or
+                           city.lower() in jam.get('route_details', '').lower()]
         
         if min_delay:
             traffic_jams = [jam for jam in traffic_jams if jam['delay_minutes'] >= min_delay]
