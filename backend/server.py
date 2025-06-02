@@ -640,123 +640,90 @@ class ANWBScraper:
         return "Oorzaak onbekend"
 
     def _extract_speed_cameras_detailed(self) -> List[Dict]:
-        """Extract speed camera data by enabling the Flitsers checkbox"""
+        """Extract dynamic flitsers (speed cameras) from ANWB website"""
         speed_cameras = []
         
         try:
-            print("Starting speed camera extraction...")
+            print("Starting dynamic flitsers extraction...")
             
-            # First, enable the "Flitsers" (speed cameras) checkbox
+            # First, try to enable the "Flitsers" checkbox to show dynamic speed cameras
             try:
-                # Look for the speed cameras checkbox
-                flitsers_checkbox = self.driver.find_element(By.XPATH, "//input[@type='checkbox' and contains(@name, 'flits') or contains(@id, 'flits')]")
-                if not flitsers_checkbox.is_selected():
-                    self.driver.execute_script("arguments[0].click();", flitsers_checkbox)
-                    print("Enabled Flitsers checkbox")
-                    time.sleep(3)  # Wait for page to update
+                # Look for flitsers checkbox or toggle
+                flitsers_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Flitser') or contains(text(), 'flitser')]")
+                
+                if flitsers_elements:
+                    print(f"Found {len(flitsers_elements)} flitser-related elements")
+                    for element in flitsers_elements:
+                        try:
+                            # Try to click the element or its parent to enable flitsers
+                            self.driver.execute_script("arguments[0].click();", element)
+                            print(f"Clicked flitser element: {element.text[:50]}")
+                            time.sleep(2)
+                            break
+                        except:
+                            continue
                 else:
-                    print("Flitsers checkbox already enabled")
+                    print("No flitser toggle elements found")
+                
             except Exception as e:
-                print(f"Could not find or enable Flitsers checkbox: {e}")
-                # Try alternative approach - look for speed camera toggle
-                try:
-                    speed_cam_toggle = self.driver.find_element(By.XPATH, "//label[contains(text(), 'Flitsers') or contains(text(), 'flits')]")
-                    self.driver.execute_script("arguments[0].click();", speed_cam_toggle)
-                    print("Clicked speed camera toggle")
-                    time.sleep(3)
-                except Exception as e2:
-                    print(f"Could not find speed camera toggle: {e2}")
-                    # Continue anyway and see if speed cameras are already visible
+                print(f"Error enabling flitsers: {e}")
             
-            # Now extract speed camera information
+            # Now look for dynamic flitser data
             try:
-                # Look for speed camera elements - they might be in a different section or have different selectors
-                camera_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'flitser') or contains(text(), 'camera') or contains(text(), 'snelheid')]")
+                # Search for flitser-specific elements in the page
+                flitser_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'flitser') or contains(text(), 'Flitser') or contains(@class, 'flitser') or contains(@class, 'speed')]")
                 
-                if not camera_elements:
-                    # Try looking for specific speed camera data structures
-                    camera_elements = self.driver.find_elements(By.CSS_SELECTOR, "[data-test-id*='camera'], [data-test-id*='flits'], .speed-camera, .flitser")
+                print(f"Found {len(flitser_elements)} potential flitser elements")
                 
-                print(f"Found {len(camera_elements)} potential speed camera elements")
+                # Also check road articles for flitser information
+                road_articles = self.driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
                 
-                if camera_elements:
-                    for idx, element in enumerate(camera_elements):
-                        try:
-                            camera_data = self._extract_speed_camera_details(element, idx)
-                            if camera_data:
-                                speed_cameras.append(camera_data)
-                        except Exception as e:
-                            print(f"Error extracting speed camera {idx}: {e}")
-                            continue
-                
-                # Alternative approach: Look for speed cameras in road articles
-                if not speed_cameras:
-                    print("No dedicated speed camera elements found, checking road articles...")
-                    road_articles = self.driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
-                    
-                    for article in road_articles:
-                        try:
-                            road = article.get_attribute('data-accordion-road')
-                            if road and road in MONITORED_ROADS:
-                                # Check if this road article contains speed camera information
-                                article_text = article.text.lower()
-                                if any(keyword in article_text for keyword in ['flitser', 'camera', 'snelheidscontrole']):
-                                    print(f"Found speed camera reference in {road}")
-                                    camera_data = self._extract_speed_camera_from_road(article, road)
-                                    if camera_data:
-                                        speed_cameras.append(camera_data)
-                        except Exception as e:
-                            print(f"Error checking road article for speed cameras: {e}")
-                            continue
+                for article in road_articles:
+                    try:
+                        road = article.get_attribute('data-accordion-road')
+                        if road and road in MONITORED_ROADS:
                             
+                            # Click to expand the accordion to look for flitsers
+                            try:
+                                button = article.find_element(By.CSS_SELECTOR, "button[data-test-id='traffic-list-road-header']")
+                                self.driver.execute_script("arguments[0].click();", button)
+                                time.sleep(1)
+                                
+                                # Look for flitser information in the expanded content
+                                article_text = article.text.lower()
+                                if 'flitser' in article_text:
+                                    print(f"Found flitser reference in {road}")
+                                    
+                                    # Extract flitser details from this road
+                                    flitser_data = self._extract_flitser_from_road(article, road)
+                                    if flitser_data:
+                                        speed_cameras.append(flitser_data)
+                                        
+                            except Exception as e:
+                                print(f"Error processing road {road} for flitsers: {e}")
+                                continue
+                                
+                    except Exception as e:
+                        print(f"Error checking road article for flitsers: {e}")
+                        continue
+                
+                # Process standalone flitser elements
+                for idx, element in enumerate(flitser_elements):
+                    try:
+                        flitser_data = self._extract_flitser_details(element, idx)
+                        if flitser_data:
+                            speed_cameras.append(flitser_data)
+                    except Exception as e:
+                        print(f"Error extracting flitser {idx}: {e}")
+                        continue
+                        
             except Exception as e:
-                print(f"Error extracting speed camera elements: {e}")
+                print(f"Error extracting flitser elements: {e}")
                 
         except Exception as e:
             print(f"Error in _extract_speed_cameras_detailed: {e}")
         
-        print(f"Total speed cameras extracted: {len(speed_cameras)}")
-        
-        # For demonstration purposes, add some sample speed cameras when no real data is extracted
-        if not speed_cameras:
-            print("No speed cameras extracted from ANWB, adding demo data...")
-            sample_cameras = [
-                {
-                    'id': f"camera_A67_{int(time.time())}_demo1",
-                    'road': 'A67',
-                    'location': 'Eindhoven-Noord richting Venlo',
-                    'direction': 'richting Venlo',
-                    'camera_type': 'Vaste flitser',
-                    'speed_limit': 100,
-                    'last_updated': datetime.now()
-                },
-                {
-                    'id': f"camera_A2_{int(time.time())}_demo2",
-                    'road': 'A2',
-                    'location': "'s-Hertogenbosch-Oost",
-                    'direction': 'richting Utrecht',
-                    'camera_type': 'Trajectcontrole',
-                    'speed_limit': 130,
-                    'last_updated': datetime.now()
-                },
-                {
-                    'id': f"camera_N69_{int(time.time())}_demo3",
-                    'road': 'N69',
-                    'location': 'Valkenswaard centrum',
-                    'direction': 'richting Eindhoven',
-                    'camera_type': 'Vaste flitser',
-                    'speed_limit': 50,
-                    'last_updated': datetime.now()
-                }
-            ]
-            
-            # Filter demo cameras based on monitored roads
-            for camera in sample_cameras:
-                if camera['road'] in MONITORED_ROADS:
-                    speed_cameras.append(camera)
-            
-            print(f"Added {len(speed_cameras)} demo speed cameras")
-        
+        print(f"Total dynamic flitsers extracted: {len(speed_cameras)}")
         return speed_cameras
 
     def _extract_speed_camera_details(self, element, idx: int) -> Dict:
