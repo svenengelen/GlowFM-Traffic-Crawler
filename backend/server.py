@@ -325,7 +325,7 @@ class ANWBScraper:
         return traffic_jams
 
     def _extract_jam_details(self, item_element, road: str, idx: int) -> Dict:
-        """Extract details from a specific traffic jam item"""
+        """Extract detailed information from a specific traffic jam item"""
         try:
             # Get all text content from the item
             text_content = item_element.text.strip()
@@ -335,14 +335,28 @@ class ANWBScraper:
             
             print(f"Processing traffic item {idx} for {road}: {text_content}")
             
-            # Extract direction (looking for common Dutch direction indicators)
-            direction = self._extract_direction(text_content)
-            
-            # Extract exits/locations
-            from_exit, to_exit = self._extract_exits(text_content)
-            
-            # Extract cause
-            cause = self._extract_cause(text_content)
+            # Try to get more detailed HTML structure for better extraction
+            try:
+                # Look for direction/route information in specific elements
+                direction_elements = item_element.find_elements(By.CSS_SELECTOR, "[class*='direction'], [class*='route'], h3, h4")
+                route_elements = item_element.find_elements(By.CSS_SELECTOR, "[class*='location'], [class*='exit'], [class*='afrit']")
+                cause_elements = item_element.find_elements(By.CSS_SELECTOR, "[class*='cause'], [class*='reason'], em, i, [style*='italic']")
+                
+                # Extract direction and locations
+                direction, source_location, destination_location = self._extract_detailed_direction_and_locations(text_content, direction_elements)
+                
+                # Extract route details (like "afrit panningen - venlo-noordwest")
+                route_details = self._extract_route_details(text_content, route_elements)
+                
+                # Extract cause (cursive/italic text like "Langzaam rijdend verkeer")
+                cause = self._extract_detailed_cause(text_content, cause_elements)
+                
+            except Exception as e:
+                print(f"Error extracting detailed elements: {e}")
+                # Fallback to text-based extraction
+                direction, source_location, destination_location = self._extract_detailed_direction_and_locations(text_content, [])
+                route_details = self._extract_route_details(text_content, [])
+                cause = self._extract_detailed_cause(text_content, [])
             
             # Extract delay and length
             delay_minutes = self._extract_delay_minutes(text_content)
@@ -353,8 +367,9 @@ class ANWBScraper:
                     'id': f"{road}_{int(time.time())}_{idx}",
                     'road': road,
                     'direction': direction,
-                    'from_exit': from_exit,
-                    'to_exit': to_exit,
+                    'source_location': source_location,
+                    'destination_location': destination_location,
+                    'route_details': route_details,
                     'cause': cause,
                     'delay_minutes': delay_minutes,
                     'length_km': length_km,
