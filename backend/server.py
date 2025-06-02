@@ -49,6 +49,7 @@ class SpeedCamera(BaseModel):
     road: str
     location: str
     direction: Optional[str] = None
+    hectometer: Optional[str] = None  # Hectometer number (e.g. "12.3")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 class TrafficResponse(BaseModel):
