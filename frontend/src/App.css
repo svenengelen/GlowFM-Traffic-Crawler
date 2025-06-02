@@ -2,35 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-.App {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #f1f1f1;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: #c1c1c1;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* Smooth transitions */
-* {
-  transition: all 0.2s ease-in-out;
+  background: #a8a8a8;
 }
 
 /* Loading animation */
@@ -44,45 +47,148 @@
   animation: spin 1s linear infinite;
 }
 
-/* Button hover effects */
-button:not(:disabled):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+/* Traffic severity indicators */
+.severity-low {
+  @apply bg-green-100 text-green-800 border-green-200;
 }
 
-button:not(:disabled):active {
-  transform: translateY(0);
+.severity-medium {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-200;
 }
 
-/* Card hover effects */
-.shadow:hover {
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+.severity-high {
+  @apply bg-orange-100 text-orange-800 border-orange-200;
+}
+
+.severity-critical {
+  @apply bg-red-100 text-red-800 border-red-200;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+  @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-lg shadow-md border border-gray-200;
+}
+
+.card-header {
+  @apply px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg;
+}
+
+.card-body {
+  @apply p-6;
 }
 
 /* Status indicators */
 .status-indicator {
-  position: relative;
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
 
-.status-indicator::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, #3b82f6, #10b981);
-  border-radius: 1px;
+.status-good {
+  @apply bg-green-100 text-green-800;
 }
 
-/* Responsive design improvements */
-@media (max-width: 640px) {
-  .text-2xl {
-    font-size: 1.5rem;
+.status-warning {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-danger {
+  @apply bg-red-100 text-red-800;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .grid-responsive {
+    grid-template-columns: 1fr;
   }
   
-  .px-4 {
+  .text-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .px-responsive {
     padding-left: 1rem;
     padding-right: 1rem;
   }
+}
+
+/* Dark mode support (future enhancement) */
+@media (prefers-color-scheme: dark) {
+  .dark-mode {
+    @apply bg-gray-900 text-white;
+  }
+  
+  .dark-mode .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .dark-mode .card-header {
+    @apply bg-gray-700 border-gray-600;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-friendly {
+    @apply text-black bg-white;
+  }
+}
+
+/* Accessibility improvements */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-offset-2;
+}
+
+/* Custom utility classes */
+.text-traffic-delay {
+  @apply text-red-600 font-semibold;
+}
+
+.text-traffic-length {
+  @apply text-blue-600 font-medium;
+}
+
+.bg-traffic-severity-1 {
+  @apply bg-green-500;
+}
+
+.bg-traffic-severity-2 {
+  @apply bg-yellow-500;
+}
+
+.bg-traffic-severity-3 {
+  @apply bg-orange-500;
+}
+
+.bg-traffic-severity-4 {
+  @apply bg-red-500;
+}
+
+/* Loading states */
+.loading-skeleton {
+  @apply bg-gray-200 animate-pulse rounded;
+}
+
+.loading-text {
+  @apply h-4 bg-gray-200 rounded animate-pulse;
+}
+
+/* Hover effects */
+.hover-lift {
+  @apply transition-transform duration-200 hover:transform hover:-translate-y-1;
+}
+
+.hover-glow {
+  @apply transition-shadow duration-200 hover:shadow-lg;
 }
