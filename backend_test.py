@@ -14,18 +14,18 @@ class ANWBTrafficTester:
             'Nijmegen', 'Oss', 'Zonzeel', 'Breda', 'Tilburg', 'Rotterdam', 'Deurne', 
             'Helmond', 'Venray', 'Heerlen', 'Maastricht', 'Belgische Grens', 'Duitse Grens', 'Valkenswaard'
         ]
-        # Expected fields in traffic jam objects
+        # Expected fields in traffic jam objects with enhanced structure
         self.expected_traffic_jam_fields = [
-            'id', 'road', 'direction', 'from_exit', 'to_exit', 'cause', 
-            'delay_minutes', 'length_km', 'last_updated'
+            'id', 'road', 'direction', 'source_location', 'destination_location', 
+            'route_details', 'cause', 'delay_minutes', 'length_km', 'last_updated'
         ]
-        # Expected fields in speed camera objects
+        # Expected fields in speed camera objects with enhanced structure
         self.expected_speed_camera_fields = [
-            'id', 'road', 'location', 'direction', 'camera_type', 'speed_limit', 'last_updated'
+            'id', 'road', 'location', 'direction', 'flitser_type', 'is_active', 'last_updated'
         ]
-        # Expected camera types
-        self.expected_camera_types = [
-            'Vaste flitser', 'Mobiele flitser', 'Trajectcontrole', 'Roodlichtcamera'
+        # Expected flitser types
+        self.expected_flitser_types = [
+            'Mobiele flitser', 'Actieve flitser', 'Snelheidscontrole'
         ]
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
