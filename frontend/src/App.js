@@ -142,10 +142,10 @@ function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats */}
         {trafficData && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow p-6">
               <div className="text-2xl font-bold text-gray-900">{trafficData.filtered_jams}</div>
-              <div className="text-sm text-gray-600">Actieve Files</div>
+              <div className="text-sm text-gray-600">Files</div>
               {trafficData.total_jams !== trafficData.filtered_jams && (
                 <div className="text-xs text-gray-500">
                   van {trafficData.total_jams} totaal
@@ -154,11 +154,7 @@ function App() {
             </div>
             <div className="bg-white rounded-lg shadow p-6">
               <div className="text-2xl font-bold text-gray-900">{trafficData.speed_cameras.length}</div>
-              <div className="text-sm text-gray-600">Flitscamera's</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-2xl font-bold text-gray-900">{TARGET_ROADS.length}</div>
-              <div className="text-sm text-gray-600">Gemonitorde Wegen</div>
+              <div className="text-sm text-gray-600">Flitsers</div>
             </div>
           </div>
         )}
