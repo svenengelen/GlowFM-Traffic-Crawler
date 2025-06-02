@@ -45,8 +45,9 @@ class TrafficJam(BaseModel):
     id: str
     road: str
     direction: str
-    from_exit: str
-    to_exit: str
+    source_location: str
+    destination_location: str
+    route_details: str
     cause: str
     delay_minutes: int
     length_km: float
