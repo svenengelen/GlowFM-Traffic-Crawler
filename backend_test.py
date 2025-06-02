@@ -14,6 +14,11 @@ class ANWBTrafficTester:
             'Nijmegen', 'Oss', 'Zonzeel', 'Breda', 'Tilburg', 'Rotterdam', 'Deurne', 
             'Helmond', 'Venray', 'Heerlen', 'Maastricht', 'Belgische Grens', 'Duitse Grens', 'Valkenswaard'
         ]
+        # Expected fields in traffic jam objects
+        self.expected_traffic_jam_fields = [
+            'id', 'road', 'direction', 'from_exit', 'to_exit', 'cause', 
+            'delay_minutes', 'length_km', 'last_updated'
+        ]
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
         """Run a single API test"""
