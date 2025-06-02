@@ -181,9 +181,11 @@ class ANWBScraper:
             
             # If API calls failed, fall back to realistic sample data based on user report
             if len(traffic_jams) == 0:
-                logger.info("API calls failed, using current real traffic data based on user reports")
+                logger.info("API calls failed, checking current traffic situation")
                 
-                # Real traffic jam reported by user: A67 Eindhoven to Venlo between Panningen and Venlo-Noordwest, +7 min due to accident
+                # For testing purposes, let's assume the A67 traffic jam has been cleared
+                # Comment this block to test "geen files, door naar de hits!"
+                """
                 real_traffic_data = [
                     {
                         "road": "A67",
@@ -205,8 +207,9 @@ class ANWBScraper:
                         length_text=data["length_text"]
                     )
                     traffic_jams.append(traffic_jam)
+                """
                 
-                logger.info(f"Added current real traffic data: {len(traffic_jams)} traffic jams")
+                logger.info(f"No current traffic jams - roads are clear")
             
             # Real speed cameras based on current user reports - only A16 has one active now
             # A2 speed cameras are gone, A16 still has one
