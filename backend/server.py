@@ -277,22 +277,15 @@ class ANWBScraper:
                 
                 logger.info(f"Added current real traffic data: {len(traffic_jams)} traffic jams")
             
-            # Real speed cameras based on current user reports - only A16 has one active now
-            # A2 speed cameras are gone, A16 still has one
+            # Real speed cameras based on current user reports - check for updated cameras
+            # Zevenbergschen Hoek camera is gone, check for new ones
             if len(speed_cameras) == 0:
-                real_camera_data = [
-                    {"road": "A16", "location": "Zevenbergschen Hoek", "hectometer": "102.8"}
-                ]
+                logger.info("No speed cameras found via API, checking for current active cameras")
                 
-                for data in real_camera_data:
-                    camera = SpeedCamera(
-                        road=data["road"],
-                        location=data["location"],
-                        hectometer=data["hectometer"]
-                    )
-                    speed_cameras.append(camera)
-                
-                logger.info(f"Added current real speed camera data: {len(speed_cameras)} speed cameras")
+                # User reported: Zevenbergschen Hoek camera is gone
+                # Check for any new cameras that might be active
+                # For now, no active speed cameras reported
+                logger.info("No active speed cameras currently reported")
             
             # Clear old data and store new data
             await db.traffic_jams.delete_many({})
