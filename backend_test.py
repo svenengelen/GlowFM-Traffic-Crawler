@@ -44,10 +44,31 @@ class GlowFMVerkeerTester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, None
 
-    def test_speed_cameras_count(self):
-        """Test that there are 0 speed cameras returned"""
+    def test_traffic_jams_count(self):
+        """Test that there are 0 traffic jams returned"""
         success, response = self.run_test(
-            "Speed Cameras Count (Should be 0)",
+            "Traffic Jams Count (Should be 0)",
+            "GET",
+            "traffic",
+            200
+        )
+        if success:
+            traffic_jams = response.get('traffic_jams', [])
+            traffic_jam_count = len(traffic_jams)
+            
+            if traffic_jam_count == 0:
+                print("✅ API returns 0 traffic jams as expected")
+                return True
+            else:
+                print(f"❌ API returns {traffic_jam_count} traffic jams, expected 0")
+                print(f"Traffic jams found: {traffic_jams}")
+                return False
+        return success
+
+    def test_speed_cameras_count_and_details(self):
+        """Test that there is 1 speed camera on A16 at Zevenbergschen Hoek"""
+        success, response = self.run_test(
+            "Speed Cameras Count and Details",
             "GET",
             "traffic",
             200
@@ -56,19 +77,56 @@ class GlowFMVerkeerTester:
             speed_cameras = response.get('speed_cameras', [])
             speed_camera_count = len(speed_cameras)
             
-            if speed_camera_count == 0:
-                print("✅ API returns 0 speed cameras as expected")
+            if speed_camera_count == 1:
+                print("✅ API returns 1 speed camera as expected")
+                
+                # Check camera details
+                camera = speed_cameras[0]
+                if camera.get('road') == 'A16':
+                    print("✅ Speed camera is on A16 as expected")
+                else:
+                    print(f"❌ Speed camera is on {camera.get('road')}, expected A16")
+                    return False
+                
+                if camera.get('location') == 'Zevenbergschen Hoek':
+                    print("✅ Speed camera location is Zevenbergschen Hoek as expected")
+                else:
+                    print(f"❌ Speed camera location is {camera.get('location')}, expected Zevenbergschen Hoek")
+                    return False
+                
+                if camera.get('hectometer') == '102.8':
+                    print("✅ Speed camera hectometer is 102.8 as expected")
+                else:
+                    print(f"❌ Speed camera hectometer is {camera.get('hectometer')}, expected 102.8")
+                    return False
+                
+                # Check that no A2 or Moerdijkbrug cameras exist
+                a2_cameras = [cam for cam in speed_cameras if cam.get('road') == 'A2']
+                moerdijk_cameras = [cam for cam in speed_cameras if 'Moerdijk' in cam.get('location', '')]
+                
+                if not a2_cameras:
+                    print("✅ No A2 speed cameras found as expected")
+                else:
+                    print(f"❌ Found {len(a2_cameras)} A2 speed cameras, expected 0")
+                    return False
+                
+                if not moerdijk_cameras:
+                    print("✅ No Moerdijkbrug speed cameras found as expected")
+                else:
+                    print(f"❌ Found {len(moerdijk_cameras)} Moerdijkbrug speed cameras, expected 0")
+                    return False
+                
                 return True
             else:
-                print(f"❌ API returns {speed_camera_count} speed cameras, expected 0")
+                print(f"❌ API returns {speed_camera_count} speed cameras, expected 1")
                 print(f"Speed cameras found: {speed_cameras}")
                 return False
         return success
 
-    def test_highway_sorting_and_count(self):
-        """Test that all 14 highways are returned in correct order"""
+    def test_custom_messages(self):
+        """Test that API returns custom messages for empty sections"""
         success, response = self.run_test(
-            "Highway Sorting and Count",
+            "Custom Messages",
             "GET",
             "traffic",
             200
@@ -76,91 +134,21 @@ class GlowFMVerkeerTester:
         if success:
             traffic_jams = response.get('traffic_jams', [])
             
-            # Extract road numbers
-            roads = [jam.get('road') for jam in traffic_jams]
-            
-            # Check if all expected roads are present
-            missing_roads = set(self.expected_roads) - set(roads)
-            extra_roads = set(roads) - set(self.expected_roads)
-            
-            if not missing_roads and not extra_roads:
-                print(f"✅ All expected roads are present: {', '.join(roads)}")
+            # Check that there are 0 traffic jams (for custom message testing)
+            if len(traffic_jams) == 0:
+                print("✅ No traffic jams found, can test custom message in UI")
             else:
-                if missing_roads:
-                    print(f"❌ Missing roads: {', '.join(missing_roads)}")
-                if extra_roads:
-                    print(f"❌ Unexpected roads: {', '.join(extra_roads)}")
-                success = False
+                print(f"❌ Found {len(traffic_jams)} traffic jams, expected 0 for custom message testing")
+                return False
+                
+            # Note: We can't directly test the UI messages here, but we can verify the data
+            # that will trigger those messages. The actual UI messages will be tested with Playwright.
             
-            # Check if roads are in correct order
-            expected_order = self.expected_roads
-            if roads == expected_order:
-                print("✅ Roads are in correct chronological order")
-            else:
-                print(f"❌ Roads are not in correct order")
-                print(f"Expected: {', '.join(expected_order)}")
-                print(f"Actual: {', '.join(roads)}")
-                success = False
-                
-            # Check Dutch text for "Geen files" and "Vrij" status
-            for jam in traffic_jams:
-                if "Geen files" not in jam.get('delay_text', '') or "Vrij" not in jam.get('length_text', ''):
-                    print(f"❌ Road {jam.get('road')} doesn't have expected Dutch text")
-                    print(f"  delay_text: {jam.get('delay_text')}")
-                    print(f"  length_text: {jam.get('length_text')}")
-                    success = False
-                    break
-            else:
-                print("✅ All roads have correct Dutch text ('Geen files' and 'Vrij')")
-                
-        return success
-
-    def test_dutch_translations(self):
-        """Test that API returns data with correct Dutch translations"""
-        success, response = self.run_test(
-            "Dutch Translations",
-            "GET",
-            "traffic",
-            200
-        )
-        if success:
-            traffic_jams = response.get('traffic_jams', [])
-            
-            # Check for Dutch text in delay_text and length_text
-            dutch_delay_terms = ["Geen files"]
-            dutch_length_terms = ["Vrij"]
-            
-            if not traffic_jams:
-                print("⚠️ No traffic jams found to test Dutch text")
-                return True
-                
-            # Check if traffic jams have correct Dutch text
-            all_correct = True
-            for jam in traffic_jams:
-                delay_text = jam.get('delay_text', '')
-                length_text = jam.get('length_text', '')
-                
-                if not any(term in delay_text for term in dutch_delay_terms):
-                    print(f"❌ Road {jam.get('road')} has incorrect delay text: '{delay_text}'")
-                    all_correct = False
-                
-                if not any(term in length_text for term in dutch_length_terms):
-                    print(f"❌ Road {jam.get('road')} has incorrect length text: '{length_text}'")
-                    all_correct = False
-            
-            if all_correct:
-                print("✅ All traffic jams have correct Dutch translations")
-                # Print a sample
-                sample = traffic_jams[0]
-                print(f"Sample Dutch text: {sample.get('road')} - {sample.get('delay_text')} - {sample.get('length_text')}")
-            else:
-                print("❌ Some traffic jams have incorrect Dutch translations")
-                success = False
-                
+            return True
         return success
 
     def test_status_endpoint(self):
-        """Test the status endpoint for correct road count"""
+        """Test the status endpoint for correct data"""
         success, response = self.run_test(
             "Status Endpoint",
             "GET",
@@ -180,10 +168,10 @@ class GlowFMVerkeerTester:
                 
             # Check speed camera count
             speed_camera_count = response.get('speed_cameras_count', -1)
-            if speed_camera_count == 0:
-                print("✅ Status endpoint reports 0 speed cameras")
+            if speed_camera_count == 1:
+                print("✅ Status endpoint reports 1 speed camera as expected")
             else:
-                print(f"❌ Status endpoint reports {speed_camera_count} speed cameras, expected 0")
+                print(f"❌ Status endpoint reports {speed_camera_count} speed cameras, expected 1")
                 success = False
                 
         return success
@@ -194,9 +182,9 @@ def main():
     
     # Run tests
     tests = [
-        tester.test_speed_cameras_count,
-        tester.test_highway_sorting_and_count,
-        tester.test_dutch_translations,
+        tester.test_traffic_jams_count,
+        tester.test_speed_cameras_count_and_details,
+        tester.test_custom_messages,
         tester.test_status_endpoint
     ]
     
