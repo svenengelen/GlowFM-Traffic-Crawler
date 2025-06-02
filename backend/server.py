@@ -58,6 +58,7 @@ class SpeedCamera(BaseModel):
     road: str
     location: str
     direction: str
+    hectometer: str  # Hectometer pole information
     flitser_type: str  # Dynamic flitser type
     is_active: bool
     last_updated: datetime
