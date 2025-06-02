@@ -171,9 +171,9 @@ class ANWBScraper:
         return False
     
     async def scrape_traffic_data(self):
-        """Scrape traffic data from ANWB using proper browser emulation"""
+        """Scrape traffic data from ANWB using text-based analysis"""
         try:
-            # Use proper browser headers and session management
+            # Use proper browser headers
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -189,160 +189,166 @@ class ANWBScraper:
                 'Cache-Control': 'max-age=0'
             }
             
-            # First, get the main page to establish session
+            # Get the main page
             main_response = self.session.get("https://anwb.nl/verkeer/filelijst", headers=headers, timeout=30)
             main_response.raise_for_status()
             
-            # Parse the main page
             soup = BeautifulSoup(main_response.content, 'html.parser')
             
             traffic_jams = []
             speed_cameras = []
             
-            logger.info("Starting real ANWB traffic data scraping")
+            logger.info("Starting text-based ANWB traffic data scraping")
             
-            # Try to extract Next.js data first
-            next_data = soup.find('script', {'id': '__NEXT_DATA__'})
-            if next_data:
-                try:
-                    data = json.loads(next_data.get_text())
-                    
-                    # Look for traffic data in various paths
-                    traffic_paths = [
-                        ['props', 'pageProps', 'pageContextData', 'applicationData', 'traffic-list'],
-                        ['props', 'pageProps', 'pageData', 'traffic'],
-                        ['props', 'pageProps', 'traffic'],
-                        ['props', 'initialState', 'traffic']
-                    ]
-                    
-                    traffic_data_found = False
-                    for path in traffic_paths:
-                        try:
-                            current = data
-                            for key in path:
-                                current = current[key]
-                            
-                            if current and current is not None:
-                                logger.info(f"Found traffic data at path: {' -> '.join(path)}")
-                                traffic_jams = self.process_nextjs_traffic_data(current)
-                                traffic_data_found = True
-                                break
-                        except (KeyError, TypeError):
-                            continue
-                    
-                    if not traffic_data_found:
-                        logger.info("No traffic data found in Next.js data structure")
-                        
-                except json.JSONDecodeError:
-                    logger.error("Could not parse Next.js data")
+            # Get all text from the page
+            page_text = soup.get_text()
+            lines = [line.strip() for line in page_text.split('\n') if line.strip()]
+            full_text = ' '.join(lines)
             
-            # If Next.js approach failed, try API endpoints with proper session
-            if not traffic_jams:
-                logger.info("Trying ANWB API endpoints with session cookies")
-                
-                # Update headers for API calls
-                api_headers = headers.copy()
-                api_headers.update({
-                    'Accept': 'application/json, text/plain, */*',
-                    'Referer': 'https://anwb.nl/verkeer/filelijst',
-                    'X-Requested-With': 'XMLHttpRequest'
-                })
-                
-                # Try the component rendering endpoints with session
-                api_endpoints = [
-                    "https://site-production.anwb.bloomreach.cloud/verkeer/resourceapi/filelijst?_hn:type=component-rendering&_hn:ref=p1&preflight=false",
-                    "https://site-production.anwb.bloomreach.cloud/verkeer/resourceapi/filelijst",
-                    "https://anwb.nl/verkeer/api/traffic",
-                    "https://anwb.nl/api/verkeer"
-                ]
-                
-                for endpoint in api_endpoints:
+            logger.info(f"Analyzing {len(full_text)} characters of text from ANWB")
+            
+            # Check if page shows no traffic
+            if '0 files 0 kilometer' in full_text:
+                logger.info("ANWB shows '0 files 0 kilometer' - no current traffic jams")
+            
+            # Pattern to extract traffic information from text
+            traffic_patterns = [
+                # Pattern: Road + location + delay/issue
+                r'(A\d+|N\d+).*?(?:tussen|richting|naar|van|bij|knooppunt|afrit|knp\.?)\s+([A-Za-z][A-Za-z\-\s]+?).*?(\+\s*\d+\s*(?:min|minuten)|afgesloten|gedeeltelijk\s+afgesloten|politie.*?onderzoek|ongeval|file|vertraging)',
+                # Pattern: Delay + road + location
+                r'(\+\s*\d+\s*(?:min|minuten)).*?(A\d+|N\d+).*?(?:tussen|richting|naar|van|bij)\s+([A-Za-z][A-Za-z\-\s]+)',
+                # Pattern: Road closure with reason
+                r'(A\d+|N\d+).*?(?:tussen|richting|naar|van|bij)\s+([A-Za-z][A-Za-z\-\s]+?).*?(afgesloten|gedeeltelijk\s+afgesloten|politie.*?onderzoek|werkzaamheden)',
+            ]
+            
+            for pattern in traffic_patterns:
+                matches = re.finditer(pattern, full_text, re.IGNORECASE)
+                for match in matches:
                     try:
-                        logger.info(f"Trying API endpoint: {endpoint}")
-                        time.sleep(1)  # Be respectful
+                        groups = match.groups()
+                        road = None
+                        location = ""
+                        issue = ""
+                        delay_text = ""
                         
-                        api_response = self.session.get(endpoint, headers=api_headers, timeout=15)
-                        
-                        if api_response.status_code == 200:
-                            try:
-                                api_data = api_response.json()
-                                logger.info(f"Successfully got JSON from {endpoint}")
-                                
-                                # Try to extract traffic data from API response
-                                if isinstance(api_data, dict):
-                                    for key in ['files', 'traffic', 'data', 'items', 'results']:
-                                        if key in api_data and api_data[key]:
-                                            traffic_jams = self.process_api_traffic_data(api_data[key])
-                                            if traffic_jams:
-                                                logger.info(f"Found {len(traffic_jams)} traffic jams from API")
-                                                break
-                                elif isinstance(api_data, list) and api_data:
-                                    traffic_jams = self.process_api_traffic_data(api_data)
-                                    
-                                if traffic_jams:
-                                    break
-                                    
-                            except json.JSONDecodeError:
-                                logger.debug(f"Endpoint {endpoint} did not return JSON")
-                        else:
-                            logger.debug(f"Endpoint {endpoint} returned status {api_response.status_code}")
+                        # Parse match groups based on pattern
+                        if len(groups) >= 3:
+                            if groups[0] and groups[0].startswith(('+', 'A', 'N')):
+                                if groups[0].startswith('+'):  # Delay first pattern
+                                    delay_text = groups[0].strip()
+                                    road = groups[1].strip() if groups[1] else ""
+                                    location = groups[2].strip() if groups[2] else ""
+                                else:  # Road first pattern
+                                    road = groups[0].strip()
+                                    location = groups[1].strip() if groups[1] else ""
+                                    issue = groups[2].strip() if groups[2] else ""
+                                    if '+' in issue and 'min' in issue:
+                                        delay_text = issue
+                                        issue = ""
                             
+                            # Clean up location
+                            location = re.sub(r'\s+', ' ', location).strip()
+                            location = location[:50]  # Limit length
+                            
+                            # Only process if we have a valid road from our target list
+                            if road and road in TARGET_ROADS:
+                                # Check if location matches our target cities
+                                if location and self.city_matches_target(location):
+                                    traffic_jam = TrafficJam(
+                                        road=road,
+                                        location=location,
+                                        delay_minutes=self.parse_delay(delay_text),
+                                        delay_text=delay_text or issue or "File gedetecteerd",
+                                        length_km=0.0,
+                                        length_text="Lengte onbekend"
+                                    )
+                                    traffic_jams.append(traffic_jam)
+                                    logger.info(f"Found traffic jam: {road} at {location} - {delay_text or issue}")
+                    
                     except Exception as e:
-                        logger.debug(f"Error with endpoint {endpoint}: {str(e)}")
+                        logger.debug(f"Error parsing traffic match: {str(e)}")
                         continue
             
-            # If still no data, try to parse HTML directly for any traffic indicators
-            if not traffic_jams:
-                logger.info("Trying HTML parsing for traffic indicators")
-                
-                # Look for any road numbers in the HTML
-                page_text = soup.get_text().lower()
-                
-                # Check for specific road patterns with traffic indicators
-                road_patterns = [
-                    (r'a67.*?(?:afgesloten|politie|onderzoek|file|vertraging)', 'A67'),
-                    (r'a2.*?(?:afgesloten|politie|onderzoek|file|vertraging)', 'A2'),
-                    (r'a16.*?(?:afgesloten|politie|onderzoek|file|vertraging)', 'A16'),
-                    (r'a50.*?(?:afgesloten|politie|onderzoek|file|vertraging)', 'A50')
-                ]
-                
-                for pattern, road in road_patterns:
-                    matches = re.findall(pattern, page_text, re.IGNORECASE | re.DOTALL)
-                    if matches:
-                        logger.info(f"Found traffic indicator for {road}: {matches[0][:100]}")
-                        
-                        # Create a traffic jam entry based on text analysis
-                        traffic_jam = TrafficJam(
-                            road=road,
-                            location="Detected from HTML text",
-                            delay_minutes=0,
-                            delay_text="Traffic detected - details unknown",
-                            length_km=0.0,
-                            length_text="Unknown"
-                        )
-                        traffic_jams.append(traffic_jam)
+            # Look for specific current issues mentioned in text
+            specific_searches = [
+                # Look for A67 specifically
+                (r'A67.*?(?:Panningen|Venlo|Eindhoven).*?(?:politie|onderzoek|afgesloten|ongeval|\+\s*\d+\s*min)', 'A67'),
+                # Look for other roads with issues
+                (r'(A\d+|N\d+).*?(?:politie|onderzoek|afgesloten|ongeval)', 'Road with incident'),
+            ]
             
-            # If we still have no traffic data but user reported A67 issue, log this discrepancy
+            for pattern, description in specific_searches:
+                matches = re.finditer(pattern, full_text, re.IGNORECASE)
+                for match in matches:
+                    logger.info(f"Found {description}: {match.group()}")
+                    # Extract details from the match
+                    match_text = match.group()
+                    road_match = re.search(r'(A\d+|N\d+)', match_text)
+                    if road_match:
+                        road = road_match.group(1)
+                        if road in TARGET_ROADS:
+                            # Try to extract location and issue
+                            location = "Detected from text"
+                            issue = "Traffic incident detected"
+                            
+                            if 'politie' in match_text.lower() or 'onderzoek' in match_text.lower():
+                                issue = "Politieonderzoek"
+                            elif 'afgesloten' in match_text.lower():
+                                issue = "Weg afgesloten"
+                            elif 'ongeval' in match_text.lower():
+                                issue = "Ongeval"
+                            
+                            # Extract delay if present
+                            delay_match = re.search(r'\+\s*(\d+)\s*min', match_text, re.IGNORECASE)
+                            delay_text = ""
+                            delay_minutes = 0
+                            if delay_match:
+                                delay_minutes = int(delay_match.group(1))
+                                delay_text = f"+ {delay_minutes} min - {issue}"
+                            else:
+                                delay_text = issue
+                            
+                            traffic_jam = TrafficJam(
+                                road=road,
+                                location=location,
+                                delay_minutes=delay_minutes,
+                                delay_text=delay_text,
+                                length_km=0.0,
+                                length_text="Onbekend"
+                            )
+                            traffic_jams.append(traffic_jam)
+                            logger.info(f"Added specific incident: {road} - {issue}")
+            
+            # Check for speed camera information
+            # ANWB typically doesn't show speed cameras on the main traffic page
+            # but we can look for flitsers mentions
+            camera_pattern = r'(A\d+|N\d+).*?(?:flits|camera|controle).*?(?:km\s*(\d+(?:\.\d+)?)|hectometer\s*(\d+(?:\.\d+)?))'
+            camera_matches = re.finditer(camera_pattern, full_text, re.IGNORECASE)
+            
+            for match in camera_matches:
+                road = match.group(1)
+                hectometer = match.group(2) or match.group(3)
+                if road in TARGET_ROADS and hectometer:
+                    camera = SpeedCamera(
+                        road=road,
+                        location="Detected from text",
+                        hectometer=hectometer
+                    )
+                    speed_cameras.append(camera)
+                    logger.info(f"Found speed camera: {road} at km {hectometer}")
+            
+            # If no traffic found but we found general traffic indicators, note this
             if not traffic_jams:
-                logger.warning("No traffic data found via scraping, but user reported A67 police investigation")
-                logger.warning("ANWB website may have updated structure or traffic data may be in different format")
-                
-                # Create a placeholder indicating scraping needs attention
-                traffic_jam = TrafficJam(
-                    road="SYSTEM",
-                    location="Scraper needs update",
-                    delay_minutes=0,
-                    delay_text="Unable to detect current traffic - scraper may need updating",
-                    length_km=0.0,
-                    length_text="N/A"
-                )
-                traffic_jams.append(traffic_jam)
+                if 'file' in full_text.lower() and '0 files 0 kilometer' not in full_text:
+                    logger.info("Traffic indicators found but no specific jams extracted")
+                else:
+                    logger.info("No traffic jams detected - roads appear clear")
             
             # Clear old data and store new data
             await db.traffic_jams.delete_many({})
             if traffic_jams:
                 await db.traffic_jams.insert_many([jam.dict() for jam in traffic_jams])
-                logger.info(f"Stored {len(traffic_jams)} traffic entries in database")
+                logger.info(f"Stored {len(traffic_jams)} traffic jams in database")
             
             await db.speed_cameras.delete_many({})
             if speed_cameras:
@@ -356,10 +362,10 @@ class ANWBScraper:
                 upsert=True
             )
             
-            logger.info(f"Real scraping completed: {len(traffic_jams)} traffic entries and {len(speed_cameras)} speed cameras")
+            logger.info(f"Text-based scraping completed: {len(traffic_jams)} traffic jams and {len(speed_cameras)} speed cameras")
             
         except Exception as e:
-            logger.error(f"Error in real ANWB scraping: {str(e)}")
+            logger.error(f"Error in text-based ANWB scraping: {str(e)}")
             raise
     
     def process_nextjs_traffic_data(self, traffic_data):
