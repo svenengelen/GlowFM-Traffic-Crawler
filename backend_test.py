@@ -217,19 +217,21 @@ class ANWBTrafficTester:
                 if not missing_fields:
                     print(f"✅ Traffic jam has all expected fields: {', '.join(self.expected_traffic_jam_fields)}")
                     
-                    # Check that direction, from_exit, to_exit, and cause are populated (not default values)
+                    # Check that enhanced fields are populated (not default values)
                     enhanced_fields = {
                         'direction': first_jam.get('direction', ''),
-                        'from_exit': first_jam.get('from_exit', ''),
-                        'to_exit': first_jam.get('to_exit', ''),
+                        'source_location': first_jam.get('source_location', ''),
+                        'destination_location': first_jam.get('destination_location', ''),
+                        'route_details': first_jam.get('route_details', ''),
                         'cause': first_jam.get('cause', '')
                     }
                     
                     default_values = {
                         'direction': 'Onbekende richting',
-                        'from_exit': 'Onbekend',
-                        'to_exit': 'Onbekend',
-                        'cause': 'Onbekende oorzaak'
+                        'source_location': 'Onbekend',
+                        'destination_location': 'Onbekend',
+                        'route_details': 'Route onbekend',
+                        'cause': 'Oorzaak onbekend'
                     }
                     
                     populated_fields = [field for field, value in enhanced_fields.items() 
