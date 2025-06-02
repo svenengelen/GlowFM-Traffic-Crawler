@@ -262,6 +262,11 @@ function App() {
                         <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded">
                           {camera.road}
                         </span>
+                        {camera.hectometer && (
+                          <span className="bg-green-600 text-white text-xs font-semibold px-2.5 py-0.5 rounded">
+                            km {camera.hectometer}
+                          </span>
+                        )}
                         <div className="flex-1">
                           <p className="text-sm font-medium text-gray-900">{camera.location}</p>
                           {camera.direction && (
