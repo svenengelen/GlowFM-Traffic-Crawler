@@ -194,11 +194,14 @@ class ANWBTrafficTester:
         )
         if success and 'traffic_jams' in response:
             traffic_jams = response['traffic_jams']
-            if all(jam['road'] == 'A67' for jam in traffic_jams):
-                print(f"✅ Road filtering works correctly, found {len(traffic_jams)} A67 jams")
+            if traffic_jams:
+                if all(jam['road'] == 'A67' for jam in traffic_jams):
+                    print(f"✅ Road filtering works correctly, found {len(traffic_jams)} A67 jams")
+                else:
+                    print("❌ Road filtering returned non-A67 jams")
+                    return False
             else:
-                print("❌ Road filtering returned non-A67 jams")
-                return False
+                print("ℹ️ No A67 traffic jams found - filter works but no matching data")
         else:
             return False
 
@@ -212,11 +215,14 @@ class ANWBTrafficTester:
         )
         if success and 'traffic_jams' in response:
             traffic_jams = response['traffic_jams']
-            if all(jam['delay_minutes'] >= 1 for jam in traffic_jams):
-                print(f"✅ Delay filtering works correctly, found {len(traffic_jams)} jams with 1+ min delay")
+            if traffic_jams:
+                if all(jam['delay_minutes'] >= 1 for jam in traffic_jams):
+                    print(f"✅ Delay filtering works correctly, found {len(traffic_jams)} jams with 1+ min delay")
+                else:
+                    print("❌ Delay filtering returned jams with less than 1 min delay")
+                    return False
             else:
-                print("❌ Delay filtering returned jams with less than 1 min delay")
-                return False
+                print("ℹ️ No traffic jams with 1+ min delay found - filter works but no matching data")
         else:
             return False
 
