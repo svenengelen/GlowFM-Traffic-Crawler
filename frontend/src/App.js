@@ -253,18 +253,18 @@ function App() {
             {/* Speed Cameras */}
             <div className="bg-white rounded-lg shadow">
               <div className="p-6 border-b">
-                <h2 className="text-lg font-semibold text-gray-900">Flitscamera's</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Flitsers</h2>
               </div>
               <div className="divide-y divide-gray-200">
                 {trafficData.speed_cameras.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
-                    Geen flitscamera's gevonden met de huidige filters
+                    Geen flitsers gevonden met de huidige filters
                   </div>
                 ) : (
                   trafficData.speed_cameras.map((camera, index) => (
                     <div key={camera.id || index} className="p-6">
                       <div className="flex items-start space-x-3">
-                        <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded">
+                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded ${getRoadStyle(camera.road)}`}>
                           {camera.road}
                         </span>
                         {camera.hectometer && (
