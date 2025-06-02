@@ -123,6 +123,12 @@ class ANWBScraper:
             
             # Find all road sections - they are in articles with data-test-id="traffic-list-road"
             road_articles = soup.find_all('article', {'data-test-id': 'traffic-list-road'})
+            
+            # Check if the page shows "no traffic" state
+            empty_state = soup.find('div', {'data-test-id': 'traffic-list-roads-empty'})
+            if empty_state:
+                logger.info("ANWB website shows no current traffic jams (empty state)")
+            
             logger.info(f"Found {len(road_articles)} road articles on ANWB website")
             
             for i, article in enumerate(road_articles):
