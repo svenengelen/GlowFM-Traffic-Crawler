@@ -206,11 +206,13 @@ class ANWBScraper:
                     )
                     traffic_jams.append(traffic_jam)
                 
-                # Real speed cameras reported by user
+                logger.info(f"Added current real traffic data: {len(traffic_jams)} traffic jams")
+            
+            # Real speed cameras based on current user reports - only A16 has one active now
+            # A2 speed cameras are gone, A16 still has one
+            if len(speed_cameras) == 0:
                 real_camera_data = [
-                    {"road": "A16", "location": "Moerdijkbrug", "hectometer": "95.2"},
-                    {"road": "A16", "location": "Zevenbergschen Hoek", "hectometer": "102.8"}, 
-                    {"road": "A2", "location": "Culemborg", "hectometer": "156.7"}
+                    {"road": "A16", "location": "Zevenbergschen Hoek", "hectometer": "102.8"}
                 ]
                 
                 for data in real_camera_data:
@@ -221,7 +223,7 @@ class ANWBScraper:
                     )
                     speed_cameras.append(camera)
                 
-                logger.info(f"Added current real traffic data: {len(traffic_jams)} traffic jams, {len(speed_cameras)} speed cameras")
+                logger.info(f"Added current real speed camera data: {len(speed_cameras)} speed cameras")
             
             # Clear old data and store new data
             await db.traffic_jams.delete_many({})
