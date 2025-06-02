@@ -841,6 +841,110 @@ class ANWBScraper:
         """Legacy method - redirects to flitser extraction"""
         return self._extract_flitser_from_road(article_element, road)
 
+    def _extract_flitser_details(self, element, idx: int) -> Dict:
+        """Extract details from a dynamic flitser element"""
+        try:
+            text_content = element.text.strip()
+            
+            if not text_content or len(text_content) < 5:
+                return None
+            
+            print(f"Processing flitser element {idx}: {text_content}")
+            
+            # Extract road information
+            road = self._extract_road_from_text(text_content)
+            
+            # Extract location and direction
+            location = self._extract_camera_location(text_content)
+            direction, _, _ = self._extract_detailed_direction_and_locations(text_content, [])
+            
+            # Determine flitser type and activity status
+            flitser_type, is_active = self._extract_flitser_type_and_status(text_content)
+            
+            if road and road in MONITORED_ROADS:
+                return {
+                    'id': f"flitser_{road}_{int(time.time())}_{idx}",
+                    'road': road,
+                    'location': location,
+                    'direction': direction,
+                    'flitser_type': flitser_type,
+                    'is_active': is_active,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting flitser details: {e}")
+        
+        return None
+
+    def _extract_flitser_from_road(self, article_element, road: str) -> Dict:
+        """Extract flitser data from a road article"""
+        try:
+            text_content = article_element.text.strip()
+            
+            # Look for flitser specific information in the road article
+            if 'flitser' in text_content.lower():
+                location = self._extract_camera_location(text_content)
+                direction, _, _ = self._extract_detailed_direction_and_locations(text_content, [])
+                flitser_type, is_active = self._extract_flitser_type_and_status(text_content)
+                
+                return {
+                    'id': f"flitser_{road}_{int(time.time())}_0",
+                    'road': road,
+                    'location': location,
+                    'direction': direction,
+                    'flitser_type': flitser_type,
+                    'is_active': is_active,
+                    'last_updated': datetime.now()
+                }
+                
+        except Exception as e:
+            print(f"Error extracting flitser from road: {e}")
+        
+        return None
+
+    def _extract_flitser_type_and_status(self, text: str) -> tuple:
+        """Extract flitser type and activity status"""
+        flitser_type = "Mobiele flitser"  # Default for dynamic flitsers
+        is_active = True  # Assume active if mentioned
+        
+        text_lower = text.lower()
+        
+        # Determine flitser type based on keywords
+        if any(keyword in text_lower for keyword in ['mobiel', 'verplaatsbaar', 'tijdelijk']):
+            flitser_type = "Mobiele flitser"
+        elif any(keyword in text_lower for keyword in ['actief', 'geplaatst', 'opgesteld']):
+            flitser_type = "Actieve flitser"
+        elif any(keyword in text_lower for keyword in ['controle', 'snelheidscontrole']):
+            flitser_type = "Snelheidscontrole"
+        
+        # Check activity status
+        if any(keyword in text_lower for keyword in ['inactief', 'weggehaald', 'gestopt', 'niet actief']):
+            is_active = False
+        
+        return flitser_type, is_active
+
+    def _extract_road_from_text(self, text: str) -> str:
+        """Extract road number from text"""
+        # Look for road patterns like A67, N2, etc.
+        road_match = re.search(r'\b([AN]\d+)\b', text.upper())
+        if road_match:
+            return road_match.group(1)
+        return ""
+
+    def _extract_camera_location(self, text: str) -> str:
+        """Extract camera location from text"""
+        # Remove road numbers and common words to get location
+        location = re.sub(r'\b[AN]\d+\b', '', text)
+        location = re.sub(r'\b(flitser|camera|snelheidscontrole|km/h|kmh)\b', '', location, flags=re.IGNORECASE)
+        location = re.sub(r'\s+', ' ', location).strip()
+        
+        # If location is too short or empty, return a default
+        if len(location) < 3:
+            return "Locatie onbekend"
+        
+        return location[:100]  # Limit length
+
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
