@@ -483,12 +483,14 @@ function App() {
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${getRoadBadgeClasses(camera.road)}`}>
                               {camera.road}
                             </span>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              {camera.camera_type}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              camera.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {camera.flitser_type}
                             </span>
-                            {camera.speed_limit > 0 && (
+                            {camera.is_active && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                {camera.speed_limit} km/h
+                                ACTIEF
                               </span>
                             )}
                           </div>
