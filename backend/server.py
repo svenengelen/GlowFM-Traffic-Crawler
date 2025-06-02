@@ -833,6 +833,14 @@ class ANWBScraper:
         
         return camera_type, speed_limit
 
+    def _extract_speed_camera_details(self, element, idx: int) -> Dict:
+        """Legacy method - redirects to flitser extraction"""
+        return self._extract_flitser_details(element, idx)
+
+    def _extract_speed_camera_from_road(self, article_element, road: str) -> Dict:
+        """Legacy method - redirects to flitser extraction"""
+        return self._extract_flitser_from_road(article_element, road)
+
     def _extract_speed_cameras(self, soup: BeautifulSoup) -> List[Dict]:
         """Extract speed camera data from HTML - placeholder for now"""
         # Note: Speed cameras would require enabling the "Flitsers" checkbox
