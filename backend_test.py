@@ -8,7 +8,7 @@ class GlowFMVerkeerTester:
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
-        self.expected_roads = ["A2", "A16", "A50", "A58", "A59", "A65", "A67", "A73", "A76", "A270", "N2", "N69", "N266", "N270"]
+        self.expected_roads = ["A2", "A16", "A50", "A58", "A59", "A65", "A67", "A73", "A76", "A270", "N2", "N69", "N266", "N270", "N279"]
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
         """Run a single API test"""
@@ -44,31 +44,71 @@ class GlowFMVerkeerTester:
             print(f"❌ Failed - Error: {str(e)}")
             return False, None
 
-    def test_traffic_jams_count(self):
-        """Test that there are 0 traffic jams returned"""
+    def test_a67_traffic_jams(self):
+        """Test that there are 2 A67 traffic jams with accidents in both directions"""
         success, response = self.run_test(
-            "Traffic Jams Count (Should be 0)",
+            "A67 Traffic Jams (Should be 2 with accidents)",
             "GET",
             "traffic",
             200
         )
         if success:
             traffic_jams = response.get('traffic_jams', [])
-            traffic_jam_count = len(traffic_jams)
+            a67_jams = [jam for jam in traffic_jams if jam.get('road') == 'A67']
             
-            if traffic_jam_count == 0:
-                print("✅ API returns 0 traffic jams as expected")
+            if len(a67_jams) == 2:
+                print(f"✅ API returns 2 A67 traffic jams as expected")
+                
+                # Check for accident in both directions
+                directions = set()
+                accident_count = 0
+                
+                for jam in a67_jams:
+                    location = jam.get('location', '')
+                    if 'Panningen' in location and 'Venlo-Noordwest' in location:
+                        print(f"✅ A67 jam includes correct location: {location}")
+                    else:
+                        print(f"❌ A67 jam has unexpected location: {location}")
+                        return False
+                    
+                    # Extract direction from location
+                    if 'Richting Venlo' in location:
+                        directions.add('Venlo')
+                    elif 'Richting Eindhoven' in location:
+                        directions.add('Eindhoven')
+                    
+                    # Check for accident in delay text
+                    delay_text = jam.get('delay_text', '')
+                    if 'Ongeval' in delay_text:
+                        accident_count += 1
+                        print(f"✅ A67 jam includes accident info: {delay_text}")
+                    else:
+                        print(f"❌ A67 jam missing accident info: {delay_text}")
+                        return False
+                
+                if len(directions) == 2:
+                    print("✅ A67 jams cover both directions (Venlo and Eindhoven)")
+                else:
+                    print(f"❌ A67 jams don't cover both directions. Found: {directions}")
+                    return False
+                
+                if accident_count == 2:
+                    print("✅ Both A67 jams report accidents")
+                else:
+                    print(f"❌ Not all A67 jams report accidents. Found: {accident_count}/2")
+                    return False
+                
                 return True
             else:
-                print(f"❌ API returns {traffic_jam_count} traffic jams, expected 0")
+                print(f"❌ API returns {len(a67_jams)} A67 traffic jams, expected 2")
                 print(f"Traffic jams found: {traffic_jams}")
                 return False
         return success
 
-    def test_speed_cameras_count_and_details(self):
-        """Test that there is 1 speed camera on A16 at Zevenbergschen Hoek"""
+    def test_speed_cameras_count(self):
+        """Test that there are 0 speed cameras (Zevenbergschen Hoek removed)"""
         success, response = self.run_test(
-            "Speed Cameras Count and Details",
+            "Speed Cameras Count (Should be 0)",
             "GET",
             "traffic",
             200
@@ -77,80 +117,72 @@ class GlowFMVerkeerTester:
             speed_cameras = response.get('speed_cameras', [])
             speed_camera_count = len(speed_cameras)
             
-            if speed_camera_count == 1:
-                print("✅ API returns 1 speed camera as expected")
-                
-                # Check camera details
-                camera = speed_cameras[0]
-                if camera.get('road') == 'A16':
-                    print("✅ Speed camera is on A16 as expected")
-                else:
-                    print(f"❌ Speed camera is on {camera.get('road')}, expected A16")
-                    return False
-                
-                if camera.get('location') == 'Zevenbergschen Hoek':
-                    print("✅ Speed camera location is Zevenbergschen Hoek as expected")
-                else:
-                    print(f"❌ Speed camera location is {camera.get('location')}, expected Zevenbergschen Hoek")
-                    return False
-                
-                if camera.get('hectometer') == '102.8':
-                    print("✅ Speed camera hectometer is 102.8 as expected")
-                else:
-                    print(f"❌ Speed camera hectometer is {camera.get('hectometer')}, expected 102.8")
-                    return False
-                
-                # Check that no A2 or Moerdijkbrug cameras exist
-                a2_cameras = [cam for cam in speed_cameras if cam.get('road') == 'A2']
-                moerdijk_cameras = [cam for cam in speed_cameras if 'Moerdijk' in cam.get('location', '')]
-                
-                if not a2_cameras:
-                    print("✅ No A2 speed cameras found as expected")
-                else:
-                    print(f"❌ Found {len(a2_cameras)} A2 speed cameras, expected 0")
-                    return False
-                
-                if not moerdijk_cameras:
-                    print("✅ No Moerdijkbrug speed cameras found as expected")
-                else:
-                    print(f"❌ Found {len(moerdijk_cameras)} Moerdijkbrug speed cameras, expected 0")
-                    return False
-                
+            if speed_camera_count == 0:
+                print("✅ API returns 0 speed cameras as expected (Zevenbergschen Hoek removed)")
                 return True
             else:
-                print(f"❌ API returns {speed_camera_count} speed cameras, expected 1")
+                print(f"❌ API returns {speed_camera_count} speed cameras, expected 0")
                 print(f"Speed cameras found: {speed_cameras}")
                 return False
         return success
 
-    def test_custom_messages(self):
-        """Test that API returns custom messages for empty sections"""
+    def test_refresh_endpoint(self):
+        """Test the refresh endpoint tries multiple ANWB API endpoints"""
         success, response = self.run_test(
-            "Custom Messages",
-            "GET",
-            "traffic",
+            "Refresh Endpoint",
+            "POST",
+            "refresh",
             200
         )
         if success:
-            traffic_jams = response.get('traffic_jams', [])
-            
-            # Check that there are 0 traffic jams (for custom message testing)
-            if len(traffic_jams) == 0:
-                print("✅ No traffic jams found, can test custom message in UI")
+            # We can't directly test the internal behavior, but we can verify the endpoint works
+            if 'message' in response and 'timestamp' in response:
+                print("✅ Refresh endpoint returns expected response format")
+                return True
             else:
-                print(f"❌ Found {len(traffic_jams)} traffic jams, expected 0 for custom message testing")
+                print(f"❌ Refresh endpoint returns unexpected response format: {response}")
                 return False
-                
-            # Note: We can't directly test the UI messages here, but we can verify the data
-            # that will trigger those messages. The actual UI messages will be tested with Playwright.
-            
-            return True
         return success
 
-    def test_status_endpoint(self):
-        """Test the status endpoint for correct data"""
+    def test_target_cities_filter(self):
+        """Test that all exits and junctions are in TARGET_CITIES filter"""
         success, response = self.run_test(
-            "Status Endpoint",
+            "Status Endpoint for TARGET_CITIES",
+            "GET",
+            "status",
+            200
+        )
+        if success:
+            target_cities = response.get('target_cities', [])
+            
+            # Check for key exits
+            key_exits = [
+                # A2 exits
+                "Utrecht-Centrum", "Eindhoven-Centrum", "Maastricht-Noord",
+                # A16 exits
+                "Rotterdam-Kralingen", "Dordrecht", "Breda-Noord",
+                # A50 exits
+                "Helmond", "Oss", "Arnhem",
+                # A67 exits
+                "Panningen", "Venlo-Noordwest",
+                # Junctions
+                "Knp. Oudenrijn", "Knp. De Hogt", "Knp. Zaarderheiken"
+            ]
+            
+            missing_exits = [exit for exit in key_exits if exit not in target_cities]
+            
+            if not missing_exits:
+                print("✅ All key exits are included in TARGET_CITIES")
+                return True
+            else:
+                print(f"❌ Some key exits are missing from TARGET_CITIES: {missing_exits}")
+                return False
+        return success
+
+    def test_monitored_roads(self):
+        """Test that all 15 roads are monitored including N279"""
+        success, response = self.run_test(
+            "Status Endpoint for Monitored Roads",
             "GET",
             "status",
             200
@@ -158,22 +190,14 @@ class GlowFMVerkeerTester:
         if success:
             target_roads = response.get('target_roads', [])
             
-            if len(target_roads) == 14 and set(target_roads) == set(self.expected_roads):
-                print(f"✅ Status endpoint returns all 14 expected roads")
+            if len(target_roads) == 15 and set(target_roads) == set(self.expected_roads):
+                print(f"✅ Status endpoint returns all 15 expected roads including N279")
+                return True
             else:
                 print(f"❌ Status endpoint returns incorrect roads")
                 print(f"Expected: {', '.join(self.expected_roads)}")
                 print(f"Actual: {', '.join(target_roads)}")
-                success = False
-                
-            # Check speed camera count
-            speed_camera_count = response.get('speed_cameras_count', -1)
-            if speed_camera_count == 1:
-                print("✅ Status endpoint reports 1 speed camera as expected")
-            else:
-                print(f"❌ Status endpoint reports {speed_camera_count} speed cameras, expected 1")
-                success = False
-                
+                return False
         return success
 
 def main():
@@ -182,10 +206,11 @@ def main():
     
     # Run tests
     tests = [
-        tester.test_traffic_jams_count,
-        tester.test_speed_cameras_count_and_details,
-        tester.test_custom_messages,
-        tester.test_status_endpoint
+        tester.test_a67_traffic_jams,
+        tester.test_speed_cameras_count,
+        tester.test_refresh_endpoint,
+        tester.test_target_cities_filter,
+        tester.test_monitored_roads
     ]
     
     for test in tests:
