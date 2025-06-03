@@ -344,7 +344,7 @@ class ANWBScraper:
                 # Enhanced timeouts and error handling
                 try:
                     # Try to use the system-installed chromedriver first
-                    service = ChromeService(executable_path='/usr/bin/chromedriver')
+                    service = Service(executable_path='/usr/bin/chromedriver')
                     print("Using system chromedriver: /usr/bin/chromedriver")
                 except Exception as e:
                     print(f"System chromedriver failed: {e}")
