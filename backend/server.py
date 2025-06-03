@@ -3492,7 +3492,7 @@ async def refresh_traffic_data():
             
             # CRITICAL: Store in the legacy format for the main endpoint
             traffic_data = {
-                'traffic_jams': all_traffic_jams,
+                'traffic_jams': all_traffic_jams,  # Keep all enhanced fields
                 'speed_cameras': flitsers,
                 'last_updated': datetime.now().isoformat(),
                 'total_jams': len(all_traffic_jams),
