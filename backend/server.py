@@ -1064,7 +1064,222 @@ class ANWBScraper:
             for road, count in road_summary.items():
                 print(f"  {road}: {count} jam(s)")
         
-        return all_traffic_jams
+    async def _expand_and_extract_individual_jams(self, page, element, mentioned_road: str) -> List[Dict]:
+        """Expand container and extract individual traffic jam details"""
+        individual_jams = []
+        
+        try:
+            print(f"🔍 Attempting to expand container for {mentioned_road}...")
+            
+            # Look for expandable elements (arrows, buttons, clickable containers)
+            expandable_selectors = [
+                'button[aria-expanded="false"]',
+                '[role="button"]',
+                '.expandable',
+                '[data-testid*="expand"]',
+                'button[class*="expand"]',
+                'button[class*="accordion"]',
+                '[class*="arrow"]',
+                'svg[class*="arrow"]',
+                '[class*="chevron"]'
+            ]
+            
+            container_expanded = False
+            
+            # Try to find and click expandable elements within or near the traffic element
+            for selector in expandable_selectors:
+                try:
+                    expandable_elements = await element.query_selector_all(selector)
+                    if not expandable_elements:
+                        # Also check parent elements
+                        parent = await element.query_selector('..')
+                        if parent:
+                            expandable_elements = await parent.query_selector_all(selector)
+                    
+                    for expand_btn in expandable_elements:
+                        try:
+                            # Check if element is visible and clickable
+                            is_visible = await expand_btn.is_visible()
+                            if is_visible:
+                                print(f"  🎯 Found expandable element: {selector}")
+                                
+                                # Click to expand
+                                await expand_btn.click()
+                                await page.wait_for_timeout(2000)  # Wait for expansion
+                                container_expanded = True
+                                print(f"  ✅ Container expanded successfully")
+                                break
+                        except Exception as e:
+                            continue
+                    
+                    if container_expanded:
+                        break
+                        
+                except Exception as e:
+                    continue
+            
+            # If no specific expandable element found, try clicking the main element
+            if not container_expanded:
+                try:
+                    print(f"  🔄 Trying to click main element for {mentioned_road}")
+                    await element.click()
+                    await page.wait_for_timeout(2000)
+                    container_expanded = True
+                    print(f"  ✅ Main element clicked, container expanded")
+                except Exception as e:
+                    print(f"  ❌ Could not expand container: {e}")
+            
+            if container_expanded:
+                # Get expanded content
+                print(f"  📖 Extracting individual jams from expanded content...")
+                
+                # Wait a bit more for content to load
+                await page.wait_for_timeout(1000)
+                
+                # Get the updated page content after expansion
+                updated_content = await page.content()
+                
+                # Also try to get content from the element itself and surrounding area
+                try:
+                    element_content = await element.inner_text()
+                    parent = await element.query_selector('..')
+                    if parent:
+                        parent_content = await parent.inner_text()
+                    else:
+                        parent_content = element_content
+                except:
+                    element_content = ""
+                    parent_content = ""
+                
+                # Combine content sources
+                combined_content = f"{element_content}\n{parent_content}"
+                
+                # Parse individual traffic jams from expanded content
+                individual_jams = self._parse_expanded_traffic_content(combined_content, mentioned_road)
+                
+                if individual_jams:
+                    print(f"  🎉 Found {len(individual_jams)} individual jams in expanded content")
+                else:
+                    print(f"  📝 No individual jams found, trying alternative parsing...")
+                    # Try parsing from full page content
+                    individual_jams = self._parse_expanded_traffic_content(updated_content, mentioned_road)
+            
+            else:
+                print(f"  ❌ Could not expand container for {mentioned_road}")
+            
+        except Exception as e:
+            print(f"Error expanding container for {mentioned_road}: {e}")
+        
+        return individual_jams
+
+    def _parse_expanded_traffic_content(self, content: str, road: str) -> List[Dict]:
+        """Parse individual traffic jams from expanded container content"""
+        individual_jams = []
+        
+        try:
+            print(f"🔍 Parsing expanded content for {road}...")
+            
+            # Split content into lines for analysis
+            lines = content.split('\n')
+            
+            # Look for traffic jam patterns in the expanded content
+            current_jam = None
+            
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if not line or len(line) < 3:
+                    continue
+                
+                # Skip lines that don't seem to contain traffic info
+                if line.lower() in ['verkeer', 'files', 'overzicht', 'meer info']:
+                    continue
+                
+                print(f"  Analyzing line: '{line}'")
+                
+                # Look for delay patterns that indicate individual jams
+                delay_patterns = [
+                    r'\+\s*(\d+)\s*min(?:uten)?',  # "+ X min"
+                    r'(\d+)\s*min(?:uten)?\s+(?:vertraging|oponthoud)',  # "X min vertraging"
+                    r'vertraging\s+(\d+)\s*min(?:uten)?',  # "vertraging X min"
+                ]
+                
+                delay_found = False
+                delay_minutes = 0
+                
+                for pattern in delay_patterns:
+                    match = re.search(pattern, line, re.IGNORECASE)
+                    if match:
+                        delay_minutes = int(match.group(1))
+                        delay_found = True
+                        print(f"    🚨 Found delay: {delay_minutes} min")
+                        break
+                
+                # Look for length patterns
+                length_km = 0
+                length_match = re.search(r'(\d+(?:\.\d+)?)\s*km', line)
+                if length_match:
+                    length_km = float(length_match.group(1))
+                    print(f"    📏 Found length: {length_km} km")
+                
+                # If we found delay info, this might be an individual jam
+                if delay_found:
+                    # Extract detailed information for this jam
+                    detailed_info = self._extract_detailed_traffic_info(line)
+                    source_city, dest_city = self._extract_city_names_from_text(line)
+                    
+                    # Look at surrounding lines for more context
+                    context_lines = []
+                    for j in range(max(0, i-2), min(len(lines), i+3)):
+                        context_line = lines[j].strip()
+                        if context_line and len(context_line) > 2:
+                            context_lines.append(context_line)
+                    
+                    context_text = ' '.join(context_lines)
+                    
+                    # If no city info found in current line, try context
+                    if source_city == "Onbekend" and dest_city == "Onbekend":
+                        source_city, dest_city = self._extract_city_names_from_text(context_text)
+                    
+                    # If no detailed info found in current line, try context
+                    if not detailed_info['direction_line'] and not detailed_info['city_line']:
+                        context_detailed_info = self._extract_detailed_traffic_info(context_text)
+                        if context_detailed_info['direction_line']:
+                            detailed_info['direction_line'] = context_detailed_info['direction_line']
+                        if context_detailed_info['city_line']:
+                            detailed_info['city_line'] = context_detailed_info['city_line']
+                    
+                    # Create individual traffic jam entry
+                    individual_jam = {
+                        'id': f"{road}_expanded_{int(time.time())}_{len(individual_jams)}",
+                        'road': road,
+                        'direction': self._extract_traffic_direction(context_text),
+                        'source_location': source_city,
+                        'destination_location': dest_city,
+                        'route_details': line,
+                        'cause': self._extract_traffic_cause(context_text),
+                        'delay_minutes': delay_minutes,
+                        'length_km': length_km,
+                        'raw_text': context_text,
+                        'enhanced_direction': self._extract_traffic_direction(context_text),
+                        'enhanced_cause': self._extract_traffic_cause(context_text),
+                        # Enhanced formatting information
+                        'direction_line': detailed_info['direction_line'],
+                        'city_line': detailed_info['city_line'],
+                        'route_info': detailed_info['route_info'],
+                        'formatted_delay': f"+ {delay_minutes} min",
+                        'last_updated': datetime.now(),
+                        'extraction_source': 'expanded_container'
+                    }
+                    
+                    individual_jams.append(individual_jam)
+                    print(f"    ✅ Created individual jam: {delay_minutes}min, {length_km}km")
+            
+            print(f"🎯 Parsed {len(individual_jams)} individual jams from expanded content")
+            
+        except Exception as e:
+            print(f"Error parsing expanded content: {e}")
+        
+        return individual_jams
         
     def _extract_city_names_from_text(self, text: str) -> tuple:
         """Extract source and destination city names from traffic text"""
