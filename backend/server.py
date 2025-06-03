@@ -3490,6 +3490,12 @@ async def refresh_traffic_data():
         if all_traffic_jams:
             print(f"Storing {len(all_traffic_jams)} traffic jams...")
             
+            # Debug: Check if enhanced fields are present
+            if all_traffic_jams:
+                sample_jam = all_traffic_jams[0]
+                print(f"Sample jam keys: {list(sample_jam.keys())}")
+                print(f"Sample jam has enhanced fields: {'formatted_delay' in sample_jam}")
+            
             # CRITICAL: Store in the legacy format for the main endpoint
             traffic_data = {
                 'traffic_jams': all_traffic_jams,  # Keep all enhanced fields
