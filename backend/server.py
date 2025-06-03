@@ -610,7 +610,13 @@ class ANWBScraper:
                         r'file.*?(\d+)\s*min(?:uten)?',
                         r'(\d+)\s*min(?:uten)?.*?file',
                         r'A58.*?(\d+)\s*min(?:uten)?',
-                        r'(\d+)\s*min(?:uten)?.*?A58'
+                        r'(\d+)\s*min(?:uten)?.*?A58',
+                        # Patterns matching the screenshot format
+                        r'\+\s*(\d+)\s*min(?:uten)?',  # "+ 6 min" format
+                        r'A58.*?Tilburg.*?Breda.*?(\d+)\s*min(?:uten)?',
+                        r'A58.*?Breda.*?Tilburg.*?(\d+)\s*min(?:uten)?',
+                        r'langzaam\s+rijdend.*?(\d+)\s*min(?:uten)?',
+                        r'stilstaand\s+verkeer.*?(\d+)\s*min(?:uten)?'
                     ]
                     
                     lines = all_text.split('\n')
