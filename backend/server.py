@@ -844,17 +844,17 @@ class ANWBScraper:
                 if not traffic_ready or not flitser_ready:
                     print("Warning: Some sessions failed to initialize properly")
                 
-                # Phase 3: Optimized traffic jam extraction
-                print("Extracting traffic jams with fast strategy...")
+                # Phase 3: Optimized traffic jam extraction with adaptive method
+                print("Extracting traffic jams with adaptive strategy...")
                 traffic_start = time.time()
-                traffic_jams = self._extract_traffic_jams_fast(traffic_driver)
+                traffic_jams = self._adaptive_traffic_extraction(traffic_driver)
                 traffic_time = time.time() - traffic_start
                 print(f"Traffic extraction completed in {traffic_time:.2f}s - Found {len(traffic_jams)} jams")
                 
-                # Phase 4: Optimized flitser extraction
-                print("Extracting flitsers with enhanced strategy...")
+                # Phase 4: Optimized flitser extraction with adaptive method
+                print("Extracting flitsers with adaptive strategy...")
                 flitser_start = time.time()
-                flitsers = self._extract_flitsers_enhanced_parallel(flitser_driver)
+                flitsers = self._adaptive_flitser_extraction(flitser_driver)
                 flitser_time = time.time() - flitser_start
                 print(f"Flitser extraction completed in {flitser_time:.2f}s - Found {len(flitsers)} flitsers")
                 
