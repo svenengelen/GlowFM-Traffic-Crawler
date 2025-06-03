@@ -361,7 +361,14 @@ class ANWBScraper:
                         service = Service()
                         print("Using default chromedriver service")
                 
-                service.creation_flags = 0x08000000  # CREATE_NO_WINDOW for Windows compatibility
+                try:
+                    # Linux/Unix specific setup
+                    import platform
+                    if platform.system() == "Windows":
+                        service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
+                    # No special flags needed for Linux
+                except Exception as e:
+                    print(f"Warning: Could not set service flags: {e}")
                 
                 # Create driver with timeout handling
                 driver = webdriver.Chrome(service=service, options=options)
