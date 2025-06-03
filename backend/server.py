@@ -3230,6 +3230,47 @@ async def scrape_optimized():
             'timestamp': int(time.time())
         }
 
+@app.post("/api/test-comprehensive")
+async def test_comprehensive_detection():
+    """Test endpoint for comprehensive traffic detection on ALL monitored roads"""
+    try:
+        print("🔍 Testing comprehensive traffic detection for ALL monitored roads...")
+        scraper = ANWBScraper()
+        traffic_jams = await scraper._comprehensive_filelijst_scraper()
+        
+        result = {
+            'success': True,
+            'traffic_jams_found': len(traffic_jams),
+            'traffic_jams': traffic_jams,
+            'message': f'Comprehensive scan: Found {len(traffic_jams)} traffic jams across all monitored roads',
+            'timestamp': int(time.time())
+        }
+        
+        # Add road breakdown
+        if traffic_jams:
+            road_summary = {}
+            for jam in traffic_jams:
+                road = jam['road']
+                if road not in road_summary:
+                    road_summary[road] = []
+                road_summary[road].append({
+                    'delay': jam['delay_minutes'],
+                    'length': jam['length_km'],
+                    'direction': jam['enhanced_direction'],
+                    'cause': jam['enhanced_cause']
+                })
+            result['roads_with_traffic'] = road_summary
+        
+        return result
+    except Exception as e:
+        print(f"Comprehensive detection test failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'traffic_jams': 0,
+            'timestamp': int(time.time())
+        }
+
 @app.post("/api/traffic/refresh")
 async def refresh_traffic_data():
     """Manually refresh traffic data using comprehensive filelijst scraper for ALL roads"""
