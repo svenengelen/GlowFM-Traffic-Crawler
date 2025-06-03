@@ -592,43 +592,83 @@ class ANWBScraper:
             return "Richting onbekend"
 
     def _extract_hectometer_info(self, text: str) -> str:
-        """Extract hectometer pole information from flitser text"""
+        """Enhanced hectometer pole information extraction with better precision"""
         try:
-            # Look for hectometer patterns like "km 25.5", "hmp 123.4", "hectometerpaal 45.2"
+            # Enhanced hectometer patterns with more precise detection
             hectometer_patterns = [
-                r'km\s+(\d+(?:\.\d+)?)',
-                r'hmp\s+(\d+(?:\.\d+)?)', 
-                r'hectometerpaal\s+(\d+(?:\.\d+)?)',
-                r'kilometerpaaltje\s+(\d+(?:\.\d+)?)',
-                r'(\d+(?:\.\d+)?)\s*km',
-                r'(\d+,\d+)\s*km',  # Dutch decimal notation
-                r'bij\s+km\s+(\d+(?:\.\d+)?)',
-                r'ter hoogte van\s+km\s+(\d+(?:\.\d+)?)'
+                # Direct kilometer references
+                r'km\s+(\d+(?:[,\.]\d+)?)',
+                r'kilometer\s+(\d+(?:[,\.]\d+)?)',
+                r'hmp\s+(\d+(?:[,\.]\d+)?)', 
+                r'hectometerpaal\s+(\d+(?:[,\.]\d+)?)',
+                r'kilometerpaaltje\s+(\d+(?:[,\.]\d+)?)',
+                
+                # Position indicators
+                r'bij\s+km\s+(\d+(?:[,\.]\d+)?)',
+                r'ter hoogte van\s+km\s+(\d+(?:[,\.]\d+)?)',
+                r'nabij\s+km\s+(\d+(?:[,\.]\d+)?)',
+                r'rond\s+km\s+(\d+(?:[,\.]\d+)?)',
+                
+                # Reverse patterns (number before km)
+                r'(\d+(?:[,\.]\d+)?)\s*km',
+                r'(\d+(?:[,\.]\d+)?)\s*kilometer',
+                
+                # Range patterns (between X and Y km)
+                r'tussen\s+km\s+(\d+(?:[,\.]\d+)?)\s+en\s+km\s+(\d+(?:[,\.]\d+)?)',
+                r'van\s+km\s+(\d+(?:[,\.]\d+)?)\s+tot\s+km\s+(\d+(?:[,\.]\d+)?)',
+                
+                # More specific location patterns
+                r'hectometer\s+(\d+(?:[,\.]\d+)?)',
+                r'hm\s+(\d+(?:[,\.]\d+)?)',
+                r'km-paal\s+(\d+(?:[,\.]\d+)?)',
             ]
             
+            # Try each pattern
             for pattern in hectometer_patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
-                    km_value = match.group(1).replace(',', '.')  # Convert Dutch decimal
-                    return f"km {km_value}"
-            
-            # Look for general numeric indicators that might be hectometers
-            numeric_patterns = [
-                r'(\d+\.\d+)',  # Decimal numbers
-                r'(\d+,\d+)'    # Dutch decimal notation
-            ]
-            
-            for pattern in numeric_patterns:
-                matches = re.findall(pattern, text)
-                if matches:
-                    # Take the first reasonable number (between 0 and 200 km)
-                    for match in matches:
+                    # Handle range patterns (take the middle point)
+                    groups = match.groups()
+                    if len(groups) == 2 and groups[1]:  # Range pattern
                         try:
-                            km_val = float(match.replace(',', '.'))
-                            if 0 <= km_val <= 200:  # Reasonable km range
-                                return f"km {km_val}"
+                            km1 = float(groups[0].replace(',', '.'))
+                            km2 = float(groups[1].replace(',', '.'))
+                            avg_km = (km1 + km2) / 2
+                            return f"km {avg_km:.1f} (tussen {km1}-{km2})"
                         except:
                             continue
+                    else:
+                        # Single value pattern
+                        km_value = groups[0].replace(',', '.')  # Convert Dutch decimal
+                        try:
+                            km_float = float(km_value)
+                            if 0 <= km_float <= 300:  # Extended reasonable range
+                                return f"km {km_float}"
+                        except:
+                            continue
+            
+            # Enhanced numeric search with context validation
+            text_words = text.split()
+            for i, word in enumerate(text_words):
+                # Look for standalone numbers that might be kilometers
+                if re.match(r'^\d+(?:[,\.]\d+)?$', word):
+                    try:
+                        km_val = float(word.replace(',', '.'))
+                        if 0 <= km_val <= 300:
+                            # Check context around the number
+                            context_start = max(0, i-2)
+                            context_end = min(len(text_words), i+3)
+                            context = ' '.join(text_words[context_start:context_end]).lower()
+                            
+                            # Strong context indicators
+                            if any(indicator in context for indicator in ['km', 'kilometer', 'hectometer', 'paal', 'hmp']):
+                                return f"km {km_val}"
+                            
+                            # Moderate context indicators (road-related)
+                            if any(indicator in context for indicator in ['richting', 'bij', 'ter hoogte', 'nabij', 'afrit']):
+                                return f"km {km_val} (geschat)"
+                    except:
+                        continue
             
             return "Hectometer onbekend"
             
