@@ -599,7 +599,9 @@ class ANWBScraper:
                         r'(\d+)\s*min(?:uten)?\s+file',
                         r'file\s+(\d+)\s*min(?:uten)?',
                         r'file.*?(\d+)\s*min(?:uten)?',
-                        r'(\d+)\s*min(?:uten)?.*?file'
+                        r'(\d+)\s*min(?:uten)?.*?file',
+                        r'A58.*?(\d+)\s*min(?:uten)?',
+                        r'(\d+)\s*min(?:uten)?.*?A58'
                     ]
                     
                     lines = all_text.split('\n')
@@ -611,7 +613,85 @@ class ANWBScraper:
                                 if re.search(pattern, line, re.IGNORECASE):
                                     print(f"🚨 TRAFFIC PATTERN FOUND: {line}")
                                     patterns_found += 1
+                                    
+                                    # If this line mentions A58, definitely process it
+                                    if 'A58' in line:
+                                        print(f"🎯 A58 TRAFFIC FOUND: {line}")
+                                        delay_minutes = self._extract_delay_minutes(line)
+                                        if delay_minutes > 0:
+                                            traffic_jam = {
+                                                'id': f"A58_pattern_{int(time.time())}",
+                                                'road': 'A58',
+                                                'direction': self._extract_traffic_direction(line),
+                                                'source_location': "Pattern extraction",
+                                                'destination_location': "Pattern extraction",
+                                                'route_details': line,
+                                                'cause': self._extract_traffic_cause(line),
+                                                'delay_minutes': delay_minutes,
+                                                'length_km': self._extract_length_km(line),
+                                                'raw_text': line,
+                                                'enhanced_direction': self._extract_traffic_direction(line),
+                                                'enhanced_cause': self._extract_traffic_cause(line),
+                                                'last_updated': datetime.now()
+                                            }
+                                            traffic_jams.append(traffic_jam)
                                     break
+                    
+                    # Additional search: Look for clickable road sections
+                    print("\n🔍 Looking for clickable road sections...")
+                    try:
+                        # Look for buttons or clickable elements that might expand traffic info
+                        road_elements = await page.query_selector_all('[data-accordion-road], button[aria-expanded], [role="button"]')
+                        print(f"Found {len(road_elements)} potentially clickable elements")
+                        
+                        for element in road_elements[:10]:  # Check first 10
+                            try:
+                                element_text = await element.inner_text()
+                                if 'A58' in element_text:
+                                    print(f"🎯 Found A58 clickable element: {element_text}")
+                                    
+                                    # Try clicking to expand
+                                    await element.click()
+                                    await page.wait_for_timeout(2000)  # Wait 2 seconds
+                                    
+                                    # Check for newly visible content
+                                    updated_text = await page.inner_text("body")
+                                    new_a58_lines = [line.strip() for line in updated_text.split('\n') if 'A58' in line and line.strip()]
+                                    
+                                    print(f"After clicking, found {len(new_a58_lines)} A58 lines:")
+                                    for line in new_a58_lines[:5]:
+                                        print(f"  📝 {line}")
+                                        
+                                        # Check for traffic patterns in expanded content
+                                        for pattern in delay_patterns:
+                                            if re.search(pattern, line, re.IGNORECASE):
+                                                print(f"🚨 EXPANDED A58 TRAFFIC: {line}")
+                                                delay_minutes = self._extract_delay_minutes(line)
+                                                if delay_minutes > 0:
+                                                    traffic_jam = {
+                                                        'id': f"A58_expanded_{int(time.time())}",
+                                                        'road': 'A58',
+                                                        'direction': self._extract_traffic_direction(line),
+                                                        'source_location': "Expanded section",
+                                                        'destination_location': "Expanded section",
+                                                        'route_details': line,
+                                                        'cause': self._extract_traffic_cause(line),
+                                                        'delay_minutes': delay_minutes,
+                                                        'length_km': self._extract_length_km(line),
+                                                        'raw_text': line,
+                                                        'enhanced_direction': self._extract_traffic_direction(line),
+                                                        'enhanced_cause': self._extract_traffic_cause(line),
+                                                        'last_updated': datetime.now()
+                                                    }
+                                                    traffic_jams.append(traffic_jam)
+                                                    print(f"📋 Added A58 traffic jam: {delay_minutes}min")
+                                                break
+                                    break  # Found A58, stop looking
+                            except Exception as e:
+                                continue
+                                
+                    except Exception as e:
+                        print(f"Error checking clickable elements: {e}")
                     
                     if patterns_found == 0:
                         print("❌ No traffic delay patterns found on page")
@@ -621,6 +701,20 @@ class ANWBScraper:
                             count = all_text.lower().count(word)
                             if count > 0:
                                 print(f"📊 Found '{word}': {count} times")
+                                
+                        # Show some context around 'file' mentions
+                        print("\n🔍 Context around 'file' mentions:")
+                        file_contexts = []
+                        text_lower = all_text.lower()
+                        start = 0
+                        for i in range(min(3, text_lower.count('file'))):  # Show first 3
+                            pos = text_lower.find('file', start)
+                            if pos != -1:
+                                context_start = max(0, pos - 50)
+                                context_end = min(len(all_text), pos + 50)
+                                context = all_text[context_start:context_end].replace('\n', ' ')
+                                print(f"  📝 ...{context}...")
+                                start = pos + 1
                     
                 finally:
                     await browser.close()
