@@ -107,6 +107,13 @@ class TrafficScraper:
 class ANWBScraper:
     def __init__(self):
         self.base_url = "https://anwb.nl/verkeer/filelijst"
+        self.max_workers = 3  # Number of parallel scraping sessions
+        self.retry_attempts = 3
+        self.timeout_duration = 60
+        
+        # Configure logging for better error tracking
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
         self.driver = None
         # Initialize database connection
         self.db = db
