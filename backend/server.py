@@ -861,7 +861,39 @@ class ANWBScraper:
                                     
                                     # Check for delay patterns DIRECTLY in the clickable element text (A58 pattern)
                                     delay_match = re.search(r'\+\s*(\d+)\s*min', element_text)
-                                    if delay_match:
+                                    multiple_pattern = re.search(r'(\d+)\s*\+\s*(\d+)\s*min\s*(\d+)\s*km', element_text)
+                                    
+                                    if multiple_pattern:
+                                        # Handle multiple jams pattern like "3 + 7 min 4 km"
+                                        jam_count = int(multiple_pattern.group(1))
+                                        delay_per_jam = int(multiple_pattern.group(2))
+                                        total_length = float(multiple_pattern.group(3))
+                                        
+                                        print(f"🚨 FOUND {jam_count} MULTIPLE JAMS on {mentioned_road}: {delay_per_jam}min each, {total_length}km total")
+                                        
+                                        # Create individual jams
+                                        avg_length = total_length / jam_count if jam_count > 0 else total_length
+                                        for jam_index in range(jam_count):
+                                            traffic_jam = {
+                                                'id': f"{mentioned_road}_multiple_{int(time.time())}_{jam_index}",
+                                                'road': mentioned_road,
+                                                'direction': self._extract_traffic_direction(element_text),
+                                                'source_location': source_city,
+                                                'destination_location': dest_city,
+                                                'route_details': f"{element_text_clean} (file {jam_index+1}/{jam_count})",
+                                                'cause': self._extract_traffic_cause(element_text),
+                                                'delay_minutes': delay_per_jam,
+                                                'length_km': avg_length,
+                                                'raw_text': element_text_clean,
+                                                'enhanced_direction': self._extract_traffic_direction(element_text),
+                                                'enhanced_cause': self._extract_traffic_cause(element_text),
+                                                'last_updated': datetime.now()
+                                            }
+                                            all_traffic_jams.append(traffic_jam)
+                                            print(f"✅ CREATED INDIVIDUAL JAM {jam_index+1}: {mentioned_road} {delay_per_jam}min, {avg_length:.1f}km")
+                                        
+                                    elif delay_match:
+                                        # Handle single jam pattern like "+ 4 min"
                                         delay_minutes = int(delay_match.group(1))
                                         print(f"🚨 FOUND {mentioned_road} DELAY: {delay_minutes} minutes")
                                         
