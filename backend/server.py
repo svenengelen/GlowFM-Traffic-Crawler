@@ -795,8 +795,214 @@ class ANWBScraper:
             import traceback
             traceback.print_exc()
             
-        print(f"✅ Async Playwright scraping complete: {len(traffic_jams)} traffic jams found")
-        return traffic_jams
+    async def _comprehensive_filelijst_scraper(self) -> List[Dict]:
+        """Comprehensive filelijst scraper for ALL monitored roads using successful A58 pattern"""
+        all_traffic_jams = []
+        
+        try:
+            print("🚀 Starting comprehensive filelijst scraper for ALL monitored roads...")
+            
+            async with async_playwright() as p:
+                # Launch browser
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                try:
+                    print("📡 Navigating directly to ANWB filelijst page...")
+                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=90000)
+                    print("📄 Page loaded, waiting for content...")
+                    
+                    # Wait for basic content
+                    await page.wait_for_load_state("domcontentloaded", timeout=30000)
+                    await page.wait_for_timeout(5000)  # Wait 5 seconds for dynamic content
+                    
+                    print("🔍 Analyzing filelijst page for ALL monitored roads...")
+                    content = await page.content()
+                    print(f"📄 Filelijst page loaded, content length: {len(content)} characters")
+                    
+                    # Check which monitored roads are present
+                    roads_found = []
+                    for road in MONITORED_ROADS:
+                        if road in content:
+                            roads_found.append(road)
+                    print(f"🛣️ Monitored roads found on page: {roads_found}")
+                    
+                    # Get all text for pattern analysis
+                    all_text = await page.inner_text("body")
+                    
+                    # Look for clickable road elements (same pattern that worked for A58)
+                    print("\n🔍 Looking for clickable road sections for ALL roads...")
+                    try:
+                        # Look for buttons or clickable elements that might expand traffic info
+                        road_elements = await page.query_selector_all('[data-accordion-road], button[aria-expanded], [role="button"], .traffic-item, .road-item')
+                        print(f"Found {len(road_elements)} potentially clickable elements")
+                        
+                        for element in road_elements[:50]:  # Check first 50 elements
+                            try:
+                                element_text = await element.inner_text()
+                                element_text_clean = element_text.replace('\n', ' ').strip()
+                                
+                                # Check if this element mentions any monitored road
+                                mentioned_road = None
+                                for road in MONITORED_ROADS:
+                                    if road in element_text:
+                                        mentioned_road = road
+                                        break
+                                
+                                if mentioned_road:
+                                    print(f"🎯 Found {mentioned_road} clickable element: {element_text_clean[:100]}...")
+                                    
+                                    # Check for delay patterns DIRECTLY in the clickable element text (A58 pattern)
+                                    delay_match = re.search(r'\+\s*(\d+)\s*min', element_text)
+                                    if delay_match:
+                                        delay_minutes = int(delay_match.group(1))
+                                        print(f"🚨 FOUND {mentioned_road} DELAY: {delay_minutes} minutes")
+                                        
+                                        # Extract length too
+                                        length_match = re.search(r'(\d+)\s*km', element_text)
+                                        length_km = float(length_match.group(1)) if length_match else 0.0
+                                        
+                                        print(f"📋 {mentioned_road} Traffic Details: Delay={delay_minutes}min, Length={length_km}km")
+                                        
+                                        traffic_jam = {
+                                            'id': f"{mentioned_road}_filelijst_{int(time.time())}_{len(all_traffic_jams)}",
+                                            'road': mentioned_road,
+                                            'direction': self._extract_traffic_direction(element_text),
+                                            'source_location': "Filelijst comprehensive extraction",
+                                            'destination_location': "Filelijst comprehensive extraction",
+                                            'route_details': element_text_clean,
+                                            'cause': self._extract_traffic_cause(element_text),
+                                            'delay_minutes': delay_minutes,
+                                            'length_km': length_km,
+                                            'raw_text': element_text_clean,
+                                            'enhanced_direction': self._extract_traffic_direction(element_text),
+                                            'enhanced_cause': self._extract_traffic_cause(element_text),
+                                            'last_updated': datetime.now()
+                                        }
+                                        all_traffic_jams.append(traffic_jam)
+                                        print(f"✅ DETECTED {mentioned_road} TRAFFIC JAM: {delay_minutes}min, {length_km}km!")
+                                        
+                                    else:
+                                        # If no direct delay pattern, check for other traffic indicators
+                                        traffic_indicators = ['vertraging', 'file', 'oponthoud', 'langzaam', 'stilstaand']
+                                        if any(indicator in element_text.lower() for indicator in traffic_indicators):
+                                            print(f"📝 {mentioned_road} traffic indicator (no delay pattern): {element_text_clean[:100]}...")
+                                            
+                                            # Try to extract delay with enhanced patterns
+                                            delay_minutes = self._extract_delay_minutes(element_text)
+                                            if delay_minutes > 0:
+                                                length_km = self._extract_length_km(element_text)
+                                                
+                                                traffic_jam = {
+                                                    'id': f"{mentioned_road}_indicator_{int(time.time())}_{len(all_traffic_jams)}",
+                                                    'road': mentioned_road,
+                                                    'direction': self._extract_traffic_direction(element_text),
+                                                    'source_location': "Filelijst indicator extraction",
+                                                    'destination_location': "Filelijst indicator extraction",
+                                                    'route_details': element_text_clean,
+                                                    'cause': self._extract_traffic_cause(element_text),
+                                                    'delay_minutes': delay_minutes,
+                                                    'length_km': length_km,
+                                                    'raw_text': element_text_clean,
+                                                    'enhanced_direction': self._extract_traffic_direction(element_text),
+                                                    'enhanced_cause': self._extract_traffic_cause(element_text),
+                                                    'last_updated': datetime.now()
+                                                }
+                                                all_traffic_jams.append(traffic_jam)
+                                                print(f"✅ DETECTED {mentioned_road} TRAFFIC (indicator): {delay_minutes}min!")
+                            except Exception as e:
+                                continue
+                                
+                    except Exception as e:
+                        print(f"Error checking clickable elements: {e}")
+                    
+                    # Additional text-based search for missed traffic jams
+                    print(f"\n🔍 Additional text-based search for missed traffic jams...")
+                    lines = all_text.split('\n')
+                    
+                    for i, line in enumerate(lines):
+                        line = line.strip()
+                        if len(line) > 10:  # Reasonable length
+                            # Check if line mentions any monitored road
+                            for road in MONITORED_ROADS:
+                                if road in line:
+                                    # Look for delay patterns in this line and surrounding lines
+                                    context_lines = []
+                                    for j in range(max(0, i-2), min(len(lines), i+3)):
+                                        if lines[j].strip():
+                                            context_lines.append(lines[j].strip())
+                                    
+                                    context_text = ' '.join(context_lines)
+                                    
+                                    # Enhanced delay patterns
+                                    delay_patterns = [
+                                        r'\+\s*(\d+)\s*min(?:uten)?',  # "+ X min" format (A58 pattern)
+                                        r'(\d+)\s*min(?:uten)?\s+(?:vertraging|oponthoud)',
+                                        r'(?:vertraging|oponthoud)\s+(\d+)\s*min(?:uten)?',
+                                        r'(\d+)\s*min(?:uten)?\s+file',
+                                        r'file\s+(\d+)\s*min(?:uten)?',
+                                    ]
+                                    
+                                    for pattern in delay_patterns:
+                                        delay_match = re.search(pattern, context_text, re.IGNORECASE)
+                                        if delay_match:
+                                            delay_minutes = int(delay_match.group(1))
+                                            
+                                            # Check if we already have this traffic jam
+                                            duplicate = False
+                                            for existing_jam in all_traffic_jams:
+                                                if (existing_jam['road'] == road and 
+                                                    abs(existing_jam['delay_minutes'] - delay_minutes) <= 1):
+                                                    duplicate = True
+                                                    break
+                                            
+                                            if not duplicate:
+                                                length_km = self._extract_length_km(context_text)
+                                                
+                                                traffic_jam = {
+                                                    'id': f"{road}_text_{int(time.time())}_{len(all_traffic_jams)}",
+                                                    'road': road,
+                                                    'direction': self._extract_traffic_direction(context_text),
+                                                    'source_location': "Filelijst text extraction",
+                                                    'destination_location': "Filelijst text extraction",
+                                                    'route_details': context_text,
+                                                    'cause': self._extract_traffic_cause(context_text),
+                                                    'delay_minutes': delay_minutes,
+                                                    'length_km': length_km,
+                                                    'raw_text': context_text,
+                                                    'enhanced_direction': self._extract_traffic_direction(context_text),
+                                                    'enhanced_cause': self._extract_traffic_cause(context_text),
+                                                    'last_updated': datetime.now()
+                                                }
+                                                all_traffic_jams.append(traffic_jam)
+                                                print(f"✅ TEXT DETECTION: {road} traffic jam {delay_minutes}min")
+                                            break
+                                    break  # Found road, move to next line
+                    
+                finally:
+                    await browser.close()
+                    
+        except Exception as e:
+            print(f"❌ Comprehensive filelijst scraping failed: {e}")
+            import traceback
+            traceback.print_exc()
+            
+        print(f"✅ Comprehensive filelijst scraping complete: {len(all_traffic_jams)} traffic jams found")
+        
+        # Summary by road
+        if all_traffic_jams:
+            road_summary = {}
+            for jam in all_traffic_jams:
+                road = jam['road']
+                if road not in road_summary:
+                    road_summary[road] = 0
+                road_summary[road] += 1
+            
+            print(f"📊 Traffic jams by road:")
+            for road, count in road_summary.items():
+                print(f"  {road}: {count} jam(s)")
+        
+        return all_traffic_jams
 
     def _debug_page_structure(self, driver, page_type="traffic") -> None:
         """Debug function to analyze current page structure"""
