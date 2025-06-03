@@ -675,29 +675,54 @@ class ANWBScraper:
                                         print(f"  📝 {line}")
                                         
                                         # Check for traffic patterns in expanded content
-                                        for pattern in delay_patterns:
-                                            if re.search(pattern, line, re.IGNORECASE):
-                                                print(f"🚨 EXPANDED A58 TRAFFIC: {line}")
-                                                delay_minutes = self._extract_delay_minutes(line)
-                                                if delay_minutes > 0:
-                                                    traffic_jam = {
-                                                        'id': f"A58_expanded_{int(time.time())}",
-                                                        'road': 'A58',
-                                                        'direction': self._extract_traffic_direction(line),
-                                                        'source_location': "Expanded section",
-                                                        'destination_location': "Expanded section",
-                                                        'route_details': line,
-                                                        'cause': self._extract_traffic_cause(line),
-                                                        'delay_minutes': delay_minutes,
-                                                        'length_km': self._extract_length_km(line),
-                                                        'raw_text': line,
-                                                        'enhanced_direction': self._extract_traffic_direction(line),
-                                                        'enhanced_cause': self._extract_traffic_cause(line),
-                                                        'last_updated': datetime.now()
-                                                    }
-                                                    traffic_jams.append(traffic_jam)
-                                                    print(f"📋 Added A58 traffic jam: {delay_minutes}min")
-                                                break
+                                        text_lines = updated_text.split('\n')
+                                        for i, line in enumerate(text_lines):
+                                            line = line.strip()
+                                            
+                                            # Look for the multi-line A58 pattern from the logs
+                                            if 'A58' in line:
+                                                # Check the next few lines for delay information
+                                                delay_found = False
+                                                for j in range(1, min(5, len(text_lines) - i)):  # Check next 4 lines
+                                                    next_line = text_lines[i + j].strip()
+                                                    
+                                                    # Look for "+ X min" pattern
+                                                    delay_match = re.search(r'\+\s*(\d+)\s*min', next_line)
+                                                    if delay_match:
+                                                        delay_minutes = int(delay_match.group(1))
+                                                        print(f"🎯 FOUND A58 DELAY: {delay_minutes} minutes in line: {next_line}")
+                                                        
+                                                        # Combine the lines for full context
+                                                        combined_lines = []
+                                                        for k in range(max(0, i-1), min(len(text_lines), i+6)):
+                                                            if text_lines[k].strip():
+                                                                combined_lines.append(text_lines[k].strip())
+                                                        
+                                                        combined_text = ' '.join(combined_lines)
+                                                        print(f"📋 Combined A58 context: {combined_text}")
+                                                        
+                                                        traffic_jam = {
+                                                            'id': f"A58_filelijst_{int(time.time())}",
+                                                            'road': 'A58',
+                                                            'direction': self._extract_traffic_direction(combined_text),
+                                                            'source_location': "Filelijst extraction",
+                                                            'destination_location': "Filelijst extraction",
+                                                            'route_details': combined_text,
+                                                            'cause': self._extract_traffic_cause(combined_text),
+                                                            'delay_minutes': delay_minutes,
+                                                            'length_km': self._extract_length_km(combined_text),
+                                                            'raw_text': combined_text,
+                                                            'enhanced_direction': self._extract_traffic_direction(combined_text),
+                                                            'enhanced_cause': self._extract_traffic_cause(combined_text),
+                                                            'last_updated': datetime.now()
+                                                        }
+                                                        traffic_jams.append(traffic_jam)
+                                                        print(f"🚨 SUCCESSFULLY DETECTED A58 TRAFFIC JAM: {delay_minutes}min delay!")
+                                                        delay_found = True
+                                                        break
+                                                
+                                                if delay_found:
+                                                    break
                                     break  # Found A58, stop looking
                             except Exception as e:
                                 continue
