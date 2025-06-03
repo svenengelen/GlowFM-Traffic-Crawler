@@ -242,7 +242,7 @@ class ANWBScraper:
             chrome_options.binary_location = "/usr/bin/chromium"
             
             # Use system chromedriver with shorter timeouts
-            service = ChromeService("/usr/bin/chromedriver")
+            service = Service("/usr/bin/chromedriver")
             
             driver = webdriver.Chrome(service=service, options=chrome_options)
             
