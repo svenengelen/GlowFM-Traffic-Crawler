@@ -259,14 +259,17 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Better location precision (exact kilometer markers, junction names)"
-    - "Improved traffic cause detection (accidents, roadworks, weather)"
-    - "Faster scraping with parallel processing"
-    - "Better error handling and fallback mechanisms"
-  stuck_tasks: []
+    - "ANWB Traffic Jam Scraping"
+    - "Enhanced Flitser Detection"
+    - "Enhanced Error Handling"
+  stuck_tasks:
+    - "ANWB Traffic Jam Scraping"
+    - "Enhanced Flitser Detection"
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     - agent: "main"
       message: "User confirmed specific enhancement focus: 1) Better location precision, 2) Improved traffic cause detection, 3) Faster scraping, 4) Better error handling. Flitser detection should remain focused only on dynamic speed cameras. Starting with Phase 1: Better Location Precision."
+    - agent: "testing"
+      message: "Testing completed for all backend features. Critical issues found: 1) No traffic jams are being detected after refresh, 2) No speed cameras are being detected, 3) Error handling for invalid min_delay parameter returns 422 instead of handling gracefully. The API endpoints are working correctly but return empty data. The optimized scraping endpoint (/api/scrape-optimized) was not found. The main issue appears to be with the scraper not extracting data correctly."
