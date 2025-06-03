@@ -61,6 +61,36 @@ function App() {
     }
   };
 
+  const handleEnhancedRefresh = async () => {
+    setLoading(true);
+    try {
+      // Call the enhanced parallel processing endpoint
+      const response = await fetch(`${backendUrl}/api/traffic/enhanced`, { 
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Enhanced refresh result:', result);
+      
+      // Update the traffic data with enhanced results
+      setTrafficData(result);
+      setLastUpdated(new Date(result.timestamp * 1000));
+      
+    } catch (err) {
+      console.error('Enhanced refresh error:', err);
+      setError(`Fout bij geavanceerd verversen: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setLoading(true);
     try {
