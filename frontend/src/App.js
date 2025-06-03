@@ -64,11 +64,32 @@ function App() {
   const handleRefresh = async () => {
     setLoading(true);
     try {
-      await fetch(`${backendUrl}/api/traffic/refresh`, { method: 'POST' });
-      // Wait a moment for data to be processed
-      setTimeout(fetchTrafficData, 2000);
+      // Call the enhanced refresh endpoint with proper timeout
+      const response = await fetch(`${backendUrl}/api/traffic/refresh`, { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // No timeout on frontend, let the backend handle it
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('Refresh result:', result);
+      
+      // If refresh was successful, immediately fetch the updated data
+      if (result.success) {
+        await fetchTrafficData();
+      } else {
+        throw new Error(result.error || 'Refresh failed');
+      }
     } catch (err) {
+      console.error('Refresh error:', err);
       setError(`Fout bij verversen van data: ${err.message}`);
+      setLoading(false);
     }
   };
 
