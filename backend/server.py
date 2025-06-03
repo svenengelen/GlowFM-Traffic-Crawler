@@ -2682,7 +2682,29 @@ async def get_speed_cameras(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving speed camera data: {str(e)}")
 
-@app.post("/api/scrape-optimized")
+@app.post("/api/test-a58")
+async def test_a58_detection():
+    """Test endpoint to debug A58 traffic jam detection using Playwright"""
+    try:
+        print("🔍 Testing A58 traffic jam detection...")
+        scraper = ANWBScraper()
+        traffic_jams = scraper._playwright_scrape_traffic()
+        
+        return {
+            'success': True,
+            'traffic_jams_found': len(traffic_jams),
+            'traffic_jams': traffic_jams,
+            'message': f'Found {len(traffic_jams)} traffic jams using Playwright',
+            'timestamp': int(time.time())
+        }
+    except Exception as e:
+        print(f"A58 detection test failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'traffic_jams': 0,
+            'timestamp': int(time.time())
+        }
 async def scrape_optimized():
     """Enhanced scraping endpoint with performance optimizations and adaptive extraction"""
     try:
