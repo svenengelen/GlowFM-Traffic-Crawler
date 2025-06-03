@@ -525,11 +525,20 @@ class ANWBScraper:
                     await page.goto("https://www.anwb.nl/verkeer", timeout=30000)
                     await page.wait_for_load_state("networkidle", timeout=30000)
                     
-                    print("🔍 Analyzing page content for A58 traffic...")
+                    print("🔍 Analyzing main traffic page for A58...")
                     
-                    # Get all text content
+                    # Get all text content from main page
                     content = await page.content()
-                    print(f"📄 Page loaded, content length: {len(content)} characters")
+                    print(f"📄 Main page loaded, content length: {len(content)} characters")
+                    
+                    # Now check the filelijst page specifically
+                    print("\n📡 Navigating to ANWB filelijst page (where A58 traffic was reported)...")
+                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=30000)
+                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    
+                    print("🔍 Analyzing filelijst page for A58 traffic...")
+                    content = await page.content()
+                    print(f"📄 Filelijst page loaded, content length: {len(content)} characters")
                     
                     # Look for A58 specifically
                     if "A58" in content:
