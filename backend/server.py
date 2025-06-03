@@ -2568,6 +2568,25 @@ async def scrape_optimized():
             'timestamp': int(time.time())
         }
 
+@app.post("/api/traffic/refresh")
+async def refresh_traffic_data():
+    """Manually refresh traffic data using enhanced adaptive methods"""
+    try:
+        print("Manual refresh requested with adaptive methods")
+        scraper = ANWBScraper()
+        # Use the optimized scraping method for manual refresh too
+        result = await scraper.scrape_with_performance_optimization()
+        return result
+    except Exception as e:
+        print(f"Manual refresh failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'traffic_jams': 0,
+            'flitsers': 0,
+            'timestamp': int(time.time())
+        }
+
 @app.get("/api/roads")
 async def get_monitored_roads():
     """Get list of monitored roads"""
