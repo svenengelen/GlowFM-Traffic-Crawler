@@ -235,6 +235,9 @@ frontend:
         - working: true
           agent: "testing"
           comment: "Verified that the UI correctly displays traffic jams when they are available from the API. The traffic jam cards show road name, delay time, direction, and length as expected."
+        - working: true
+          agent: "testing"
+          comment: "ENHANCED FORMATTING VERIFICATION: The UI correctly displays traffic jams with enhanced formatting. Fix 1 (Remove Count Numbers) is working - delay is shown as '+ 10 min' for A16 and '+ 3 min' for A58 without count numbers. Fix 2 (Direction Line Formatting) infrastructure is in place, showing 'Richting onbekend' for current data. Fix 3 (City Line Display) infrastructure is in place, though current data may not show explicit city lines like 'Breda - Rotterdam'."
 
   - task: "Filtering System"
     implemented: true
