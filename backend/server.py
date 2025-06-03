@@ -826,7 +826,340 @@ class ANWBScraper:
             import traceback
             traceback.print_exc()
             
-    async def _comprehensive_filelijst_scraper(self) -> List[Dict]:
+    async def _enhanced_parallel_container_expansion(self) -> List[Dict]:
+        """Enhanced container expansion with parallel processing for faster scraping"""
+        all_traffic_jams = []
+        
+        try:
+            self.logger.info("🚀 Starting enhanced parallel container expansion...")
+            
+            # Split monitored roads into smaller groups for parallel processing
+            road_groups = [
+                ['A2', 'A16', 'A50'],      # Group 1: Major highways
+                ['A58', 'A59', 'A65'],     # Group 2: Regional highways
+                ['A67', 'A73', 'A76'],     # Group 3: Limburg highways  
+                ['A270', 'N2', 'N69'],     # Group 4: Provincial roads
+                ['N266', 'N270']           # Group 5: Local roads
+            ]
+            
+            # Process groups concurrently using asyncio.gather for better performance
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                
+                # Create concurrent tasks for each road group
+                tasks = []
+                for i, road_group in enumerate(road_groups):
+                    task = self._process_road_group_enhanced(browser, road_group, i)
+                    tasks.append(task)
+                
+                # Wait for all tasks to complete with timeout
+                try:
+                    results = await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=180)
+                    
+                    # Process results and handle any exceptions
+                    for result in results:
+                        if isinstance(result, Exception):
+                            self.logger.error(f"❌ Task failed with exception: {result}")
+                        elif isinstance(result, list):
+                            all_traffic_jams.extend(result)
+                            
+                except asyncio.TimeoutError:
+                    self.logger.error("⏰ Parallel processing timeout - falling back to sequential")
+                    return await self._comprehensive_filelijst_scraper()
+                
+                await browser.close()
+            
+            # Deduplicate results based on road and delay
+            unique_jams = self._deduplicate_traffic_jams(all_traffic_jams)
+            
+            self.logger.info(f"✅ Enhanced parallel container expansion complete: {len(unique_jams)} unique traffic jams found")
+            return unique_jams
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error in enhanced parallel processing: {e}")
+            # Fallback to original comprehensive scraper
+            return await self._comprehensive_filelijst_scraper()
+    
+    async def _process_road_group_enhanced(self, browser, road_group: List[str], group_id: int) -> List[Dict]:
+        """Process a group of roads with enhanced container expansion"""
+        results = []
+        
+        try:
+            self.logger.info(f"🔍 Processing enhanced road group {group_id}: {road_group}")
+            
+            # Create new page for this road group
+            page = await browser.new_page()
+            
+            try:
+                # Navigate with optimized timeouts
+                await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=60000)
+                await page.wait_for_load_state("domcontentloaded", timeout=20000)
+                await page.wait_for_timeout(2000)  # Reduced wait time
+                
+                # Process each road in this group
+                for road in road_group:
+                    road_results = await self._extract_road_data_enhanced(page, road)
+                    results.extend(road_results)
+                    
+                    # Small delay between roads to avoid overwhelming the server
+                    await page.wait_for_timeout(500)
+                
+            finally:
+                await page.close()
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error processing enhanced road group {group_id}: {e}")
+            
+        return results
+    
+    async def _extract_road_data_enhanced(self, page, road: str) -> List[Dict]:
+        """Extract traffic data for a specific road with enhanced container expansion"""
+        results = []
+        
+        try:
+            content = await page.content()
+            if road not in content:
+                return results
+            
+            # Look for expandable containers specific to this road
+            selectors = [
+                f'[data-road="{road}"]',
+                f'button[aria-expanded][data-testid*="{road}"]',
+                f'[role="button"]:has-text("{road}")',
+                f'.traffic-item:has-text("{road}")',
+                f'.road-section:has-text("{road}")'
+            ]
+            
+            for selector in selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    for element in elements[:10]:  # Limit to prevent timeout
+                        element_results = await self._expand_and_extract_enhanced(page, element, road)
+                        results.extend(element_results)
+                except:
+                    continue  # Try next selector if this one fails
+            
+            # Also try direct text extraction without clicking
+            direct_results = await self._direct_text_extraction_enhanced(page, road)
+            results.extend(direct_results)
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error extracting enhanced data for {road}: {e}")
+            
+        return results
+    
+    async def _expand_and_extract_enhanced(self, page, element, road: str) -> List[Dict]:
+        """Enhanced container expansion with better error handling"""
+        results = []
+        
+        try:
+            element_text = await element.inner_text()
+            
+            # Check if element is relevant to our road
+            road_pattern = rf'\b{re.escape(road)}\b'
+            if not re.search(road_pattern, element_text):
+                return results
+            
+            # Try to expand the container with retry mechanism
+            expansion_successful = False
+            for attempt in range(2):  # Maximum 2 attempts
+                try:
+                    if await element.is_visible() and await element.is_enabled():
+                        await element.click()
+                        await page.wait_for_timeout(1500)  # Wait for expansion
+                        expansion_successful = True
+                        break
+                except Exception as e:
+                    if attempt == 0:  # Only log on first attempt
+                        self.logger.debug(f"⚠️ Expansion attempt {attempt + 1} failed for {road}: {e}")
+                    continue
+            
+            # Extract data whether expansion succeeded or not
+            if expansion_successful:
+                # Get expanded content
+                updated_content = await page.content()
+                results.extend(self._parse_expanded_content_enhanced(updated_content, road, element_text))
+            else:
+                # Extract from original element text
+                results.extend(self._parse_element_text_enhanced(element_text, road))
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error in enhanced expansion for {road}: {e}")
+            
+        return results
+    
+    def _parse_expanded_content_enhanced(self, content: str, road: str, original_text: str) -> List[Dict]:
+        """Parse expanded content with enhanced accuracy"""
+        results = []
+        
+        try:
+            # Look for traffic jam patterns in expanded content
+            patterns = [
+                r'(\d+)\s*\+\s*(\d+)\s*min\s*(\d+(?:\.\d+)?)\s*km',  # Multiple jams: "3 + 7 min 4 km"
+                r'\+\s*(\d+)\s*min\s*(\d+(?:\.\d+)?)\s*km',         # Single jam with length
+                r'\+\s*(\d+)\s*min',                                 # Single jam without length
+                r'(\d+)\s*min.*?(\d+(?:\.\d+)?)\s*km',              # General duration and length
+            ]
+            
+            for pattern in patterns:
+                matches = re.finditer(pattern, content, re.IGNORECASE)
+                for match in matches:
+                    jam_data = self._create_enhanced_jam_data(match, road, original_text, 'expanded_content')
+                    if jam_data:
+                        results.append(jam_data)
+                        
+        except Exception as e:
+            self.logger.error(f"❌ Error parsing expanded content for {road}: {e}")
+            
+        return results
+    
+    def _parse_element_text_enhanced(self, element_text: str, road: str) -> List[Dict]:
+        """Parse element text with enhanced accuracy"""
+        results = []
+        
+        try:
+            # Direct text patterns
+            patterns = [
+                r'(\d+)\s*\+\s*(\d+)\s*min\s*(\d+(?:\.\d+)?)\s*km',  # Multiple jams
+                r'\+\s*(\d+)\s*min',                                 # Single jam
+            ]
+            
+            for pattern in patterns:
+                matches = re.finditer(pattern, element_text, re.IGNORECASE)
+                for match in matches:
+                    jam_data = self._create_enhanced_jam_data(match, road, element_text, 'element_text')
+                    if jam_data:
+                        results.append(jam_data)
+                        
+        except Exception as e:
+            self.logger.error(f"❌ Error parsing element text for {road}: {e}")
+            
+        return results
+    
+    def _create_enhanced_jam_data(self, match, road: str, text: str, source: str) -> Optional[Dict]:
+        """Create enhanced traffic jam data with better formatting"""
+        try:
+            groups = match.groups()
+            
+            # Parse based on pattern groups
+            if len(groups) >= 3:  # Multiple jams or full info
+                if groups[0].isdigit() and groups[1].isdigit():  # Multiple jams pattern
+                    jam_count = int(groups[0])
+                    delay = int(groups[1])
+                    length = float(groups[2])
+                else:  # Single jam with full info
+                    delay = int(groups[0])
+                    length = float(groups[1]) if groups[1] else 1.0
+                    jam_count = 1
+            elif len(groups) == 2:  # Delay and length
+                delay = int(groups[0])
+                length = float(groups[1]) if groups[1] else 1.0
+                jam_count = 1
+            elif len(groups) == 1:  # Just delay
+                delay = int(groups[0])
+                length = 1.0
+                jam_count = 1
+            else:
+                return None
+            
+            # Enhanced location extraction
+            source_city, dest_city = self._extract_city_names_from_text(text)
+            direction = self._extract_traffic_direction(text)
+            
+            return {
+                'id': f"{road}_enhanced_{int(time.time())}_{hash(text) % 10000}",
+                'road': road,
+                'direction': direction,
+                'source_location': source_city,
+                'destination_location': dest_city,
+                'cause': self._extract_traffic_cause(text),
+                'delay_minutes': delay,
+                'length_km': length,
+                'raw_text': text[:300],  # Keep more context
+                'timestamp': int(time.time()),
+                'extraction_source': f'enhanced_{source}',
+                'multiple_jams': jam_count > 1,
+                'jam_count': jam_count,
+                
+                # Enhanced formatting for better display
+                'formatted_delay': f"+{delay} min",
+                'direction_line': self._extract_direction_line(text),
+                'city_line': f"{source_city} - {dest_city}" if source_city != dest_city else source_city,
+                'route_info': self._extract_route_info(text),
+                'enhanced_direction': direction,
+                'enhanced_cause': self._extract_traffic_cause(text)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error creating enhanced jam data: {e}")
+            return None
+    
+    def _deduplicate_traffic_jams(self, jams: List[Dict]) -> List[Dict]:
+        """Remove duplicate traffic jams based on road, delay, and location"""
+        unique_jams = []
+        seen_combinations = set()
+        
+        for jam in jams:
+            # Create a unique key based on road, delay, and rough location
+            key = f"{jam.get('road')}_{jam.get('delay_minutes')}_{jam.get('source_location', '')[:10]}"
+            
+            if key not in seen_combinations:
+                seen_combinations.add(key)
+                unique_jams.append(jam)
+            else:
+                # Keep the one with more detailed information
+                existing_jam = next((j for j in unique_jams if f"{j.get('road')}_{j.get('delay_minutes')}_{j.get('source_location', '')[:10]}" == key), None)
+                if existing_jam and len(jam.get('raw_text', '')) > len(existing_jam.get('raw_text', '')):
+                    unique_jams.remove(existing_jam)
+                    unique_jams.append(jam)
+        
+        return unique_jams
+    
+    async def _direct_text_extraction_enhanced(self, page, road: str) -> List[Dict]:
+        """Direct text extraction without container expansion as fallback"""
+        results = []
+        
+        try:
+            # Get all page text
+            page_text = await page.inner_text("body")
+            
+            # Look for traffic jam patterns mentioning this road
+            road_pattern = rf'\b{re.escape(road)}\b.*?(\+\s*\d+\s*min)'
+            matches = re.finditer(road_pattern, page_text, re.IGNORECASE | re.DOTALL)
+            
+            for match in matches:
+                full_match = match.group(0)
+                delay_match = re.search(r'\+\s*(\d+)\s*min', full_match)
+                
+                if delay_match:
+                    delay = int(delay_match.group(1))
+                    source_city, dest_city = self._extract_city_names_from_text(full_match)
+                    
+                    jam_data = {
+                        'id': f"{road}_direct_{int(time.time())}_{hash(full_match) % 1000}",
+                        'road': road,
+                        'direction': self._extract_traffic_direction(full_match),
+                        'source_location': source_city,
+                        'destination_location': dest_city,
+                        'cause': self._extract_traffic_cause(full_match),
+                        'delay_minutes': delay,
+                        'length_km': 1.0,  # Default length for direct extraction
+                        'raw_text': full_match[:200],
+                        'timestamp': int(time.time()),
+                        'extraction_source': 'direct_text_enhanced',
+                        'formatted_delay': f"+{delay} min",
+                        'direction_line': self._extract_direction_line(full_match),
+                        'city_line': f"{source_city} - {dest_city}" if source_city != dest_city else source_city,
+                        'enhanced_direction': self._extract_traffic_direction(full_match),
+                        'enhanced_cause': self._extract_traffic_cause(full_match)
+                    }
+                    
+                    results.append(jam_data)
+                    
+        except Exception as e:
+            self.logger.error(f"❌ Error in direct text extraction for {road}: {e}")
+            
+        return results
         """Comprehensive filelijst scraper for ALL monitored roads using successful A58 pattern"""
         all_traffic_jams = []
         
