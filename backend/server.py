@@ -3232,31 +3232,64 @@ async def scrape_optimized():
 
 @app.post("/api/traffic/refresh")
 async def refresh_traffic_data():
-    """Manually refresh traffic data using enhanced adaptive methods with filelijst support"""
+    """Manually refresh traffic data using comprehensive filelijst scraper for ALL roads"""
     try:
-        print("Manual refresh requested with adaptive methods and filelijst support")
+        print("🚀 Enhanced refresh: comprehensive traffic detection for ALL monitored roads")
         scraper = ANWBScraper()
         
-        # First try the optimized scraping (includes main pages)
-        result = await scraper.scrape_with_performance_optimization()
+        # Use the comprehensive filelijst scraper that works for all roads
+        print("Starting comprehensive filelijst scraper...")
+        all_traffic_jams = await scraper._comprehensive_filelijst_scraper()
         
-        # Additionally, specifically check filelijst for A58 and other traffic
-        print("Additional filelijst check for comprehensive traffic detection...")
-        filelijst_traffic = await scraper._playwright_scrape_traffic_async()
+        # Store the traffic data
+        if all_traffic_jams:
+            print(f"Storing {len(all_traffic_jams)} traffic jams...")
+            await scraper._store_traffic_data_batch(all_traffic_jams)
         
-        if filelijst_traffic:
-            print(f"Found {len(filelijst_traffic)} additional traffic jams from filelijst")
-            # Store filelijst traffic data
-            await scraper._store_traffic_data_batch(filelijst_traffic)
-            
-            # Update result counts
-            result['traffic_jams'] += len(filelijst_traffic)
-            result['filelijst_traffic'] = len(filelijst_traffic)
-            result['message'] = f"Enhanced refresh: {result.get('traffic_jams', 0)} total traffic jams found (including {len(filelijst_traffic)} from filelijst)"
+        # Also try to get flitsers using the enhanced method
+        flitsers = []
+        try:
+            print("Attempting flitser detection...")
+            flitsers = await scraper._extract_flitsers_enhanced_parallel(None)  # Will handle driver creation internally
+        except Exception as e:
+            print(f"Flitser detection failed: {e}")
+        
+        # Store flitser data if any
+        if flitsers:
+            await scraper._store_flitser_data_batch(flitsers)
+        
+        total_time = time.time()
+        
+        result = {
+            'success': True,
+            'traffic_jams': len(all_traffic_jams),
+            'flitsers': len(flitsers),
+            'filelijst_traffic': len(all_traffic_jams),
+            'message': f"Comprehensive refresh: {len(all_traffic_jams)} traffic jams detected from ALL monitored roads, {len(flitsers)} flitsers",
+            'performance': {
+                'total_time': round(time.time() - total_time, 2),
+                'traffic_extraction_method': 'comprehensive_filelijst_scraper',
+                'roads_checked': len(MONITORED_ROADS)
+            },
+            'timestamp': int(time.time())
+        }
+        
+        # Add road breakdown if traffic found
+        if all_traffic_jams:
+            road_summary = {}
+            for jam in all_traffic_jams:
+                road = jam['road']
+                if road not in road_summary:
+                    road_summary[road] = []
+                road_summary[road].append(f"{jam['delay_minutes']}min")
+            result['roads_with_traffic'] = road_summary
         
         return result
+        
     except Exception as e:
-        print(f"Manual refresh failed: {e}")
+        print(f"Enhanced refresh failed: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             'success': False,
             'error': str(e),
