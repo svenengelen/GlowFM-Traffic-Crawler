@@ -1040,13 +1040,14 @@ class ANWBScraper:
                                             
                                             if not duplicate:
                                                 length_km = self._extract_length_km(context_text)
+                                                source_city, dest_city = self._extract_city_names_from_text(context_text)
                                                 
                                                 traffic_jam = {
                                                     'id': f"{road}_text_{int(time.time())}_{len(all_traffic_jams)}",
                                                     'road': road,
                                                     'direction': self._extract_traffic_direction(context_text),
-                                                    'source_location': "Filelijst text extraction",
-                                                    'destination_location': "Filelijst text extraction",
+                                                    'source_location': source_city,
+                                                    'destination_location': dest_city,
                                                     'route_details': context_text,
                                                     'cause': self._extract_traffic_cause(context_text),
                                                     'delay_minutes': delay_minutes,
