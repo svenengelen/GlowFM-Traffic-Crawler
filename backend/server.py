@@ -521,20 +521,17 @@ class ANWBScraper:
                 page = await browser.new_page()
                 
                 try:
-                    print("📡 Navigating to ANWB traffic page...")
-                    await page.goto("https://www.anwb.nl/verkeer", timeout=60000)  # Increased timeout
-                    await page.wait_for_load_state("networkidle", timeout=60000)  # Increased timeout
+                    print("🚀 Direct navigation to ANWB filelijst page for A58...")
                     
-                    print("🔍 Analyzing main traffic page for A58...")
+                    # Skip main page, go directly to filelijst where A58 traffic is shown
+                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=90000)
+                    print("📄 Page loaded, waiting for content...")
                     
-                    # Get all text content from main page
-                    content = await page.content()
-                    print(f"📄 Main page loaded, content length: {len(content)} characters")
+                    # Wait for basic content, not full network idle
+                    await page.wait_for_load_state("domcontentloaded", timeout=30000)
                     
-                    # Now check the filelijst page specifically
-                    print("\n📡 Navigating to ANWB filelijst page (where A58 traffic was reported)...")
-                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=60000)  # Increased timeout
-                    await page.wait_for_load_state("domcontentloaded", timeout=60000)  # Changed to domcontentloaded
+                    # Give it a bit more time for dynamic content
+                    await page.wait_for_timeout(5000)  # Wait 5 seconds
                     
                     print("🔍 Analyzing filelijst page for A58 traffic...")
                     content = await page.content()
