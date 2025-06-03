@@ -1085,6 +1085,8 @@ class ANWBScraper:
             for road, count in road_summary.items():
                 print(f"  {road}: {count} jam(s)")
         
+        return all_traffic_jams
+        
     def _extract_city_names_from_text(self, text: str) -> tuple:
         """Extract source and destination city names from traffic text"""
         try:
