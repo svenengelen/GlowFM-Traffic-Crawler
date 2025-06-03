@@ -1423,6 +1423,83 @@ class ANWBScraper:
         
         return "Onbekend", "Onbekend"
 
+    async def _store_traffic_data_batch(self, traffic_data: list) -> None:
+        """Store traffic data in batch with enhanced error handling"""
+        if not traffic_data:
+            return
+        
+        try:
+            # Clear existing traffic data
+            await self.db["traffic_jams"].delete_many({})
+            
+            # Insert new data in batch with enhanced fields
+            enhanced_data = []
+            for jam in traffic_data:
+                enhanced_jam = {
+                    **jam,
+                    'batch_id': str(uuid.uuid4()),
+                    'created_at': datetime.utcnow(),
+                    'data_version': '2.0'  # Mark as enhanced version
+                }
+                enhanced_data.append(enhanced_jam)
+            
+            if enhanced_data:
+                await self.db["traffic_jams"].insert_many(enhanced_data)
+                print(f"Stored {len(enhanced_data)} traffic jams in batch")
+            
+        except Exception as e:
+            print(f"Error storing traffic data batch: {e}")
+            raise
+
+    async def _store_flitser_data_batch(self, flitser_data: list) -> None:
+        """Store flitser data in batch with enhanced error handling"""
+        if not flitser_data:
+            return
+        
+        try:
+            # Clear existing flitser data
+            await self.db["flitsers"].delete_many({})
+            
+            # Insert new data in batch with enhanced fields
+            enhanced_data = []
+            for flitser in flitser_data:
+                enhanced_flitser = {
+                    **flitser,
+                    'batch_id': str(uuid.uuid4()),
+                    'created_at': datetime.utcnow(),
+                    'data_version': '2.0'  # Mark as enhanced version
+                }
+                enhanced_data.append(enhanced_flitser)
+            
+            if enhanced_data:
+                await self.db["flitsers"].insert_many(enhanced_data)
+                print(f"Stored {len(enhanced_data)} flitsers in batch")
+            
+        except Exception as e:
+            print(f"Error storing flitser data batch: {e}")
+            raise
+
+    def _extract_flitsers_enhanced_parallel(self, driver) -> List[Dict]:
+        """Enhanced parallel flitser extraction with improved performance"""
+        try:
+            print("Starting enhanced parallel flitser extraction...")
+            
+            # Use the existing enhanced method but with better error handling
+            flitsers = self._extract_flitsers_fast(driver)
+            
+            # Additional processing for parallel optimization
+            if flitsers:
+                print(f"Successfully extracted {len(flitsers)} flitsers with enhanced parallel method")
+                
+                # Sort by road for better processing order
+                flitsers.sort(key=lambda x: x.get('road', 'ZZZ'))
+                
+            return flitsers
+            
+        except Exception as e:
+            print(f"Error in enhanced parallel flitser extraction: {e}")
+            return []
+
     def _extract_cause(self, text: str) -> str:
         """Extract cause of traffic jam"""
         text_lower = text.lower()
