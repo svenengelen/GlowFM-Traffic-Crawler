@@ -1160,6 +1160,115 @@ class ANWBScraper:
         
         return "Onbekende oorzaak"
 
+    def _extract_traffic_cause(self, raw_text: str) -> str:
+        """Enhanced traffic cause detection with comprehensive Dutch traffic terminology"""
+        try:
+            text = raw_text.lower()
+            
+            # Comprehensive traffic cause patterns with priority order
+            cause_patterns = [
+                # Accidents and incidents (high priority)
+                (r'\b(ongeval|aanrijding|botsing|kop-staart|collision)\b', 'Ongeval'),
+                (r'\b(pechgeval|autopech|liegenblije[nr]|breakdown)\b', 'Pechgeval'),
+                (r'\b(brand(?:weer)?|fire)\b', 'Brand'),
+                (r'\b(hulpdiensten|ambulance|politie|emergency)\b', 'Hulpdiensten'),
+                
+                # Roadworks and construction (high priority)
+                (r'\b(wegwerkzaamheden|wegwerken|roadworks?)\b', 'Wegwerkzaamheden'),
+                (r'\b(afsluiting|afgesloten|closed?|sluiting)\b', 'Afsluiting'),
+                (r'\b(versmalling|versmald|rijstrook\s+dicht)\b', 'Versmalling'),
+                (r'\b(onderhoud|maintenance|repair)\b', 'Onderhoud'),
+                (r'\b(asfaltering|asfaltwerkzaamheden)\b', 'Asfaltering'),
+                (r'\b(brug(?:werkzaamheden)?|brugopening)\b', 'Brugwerkzaamheden'),
+                
+                # Weather conditions (medium priority)
+                (r'\b(gladheid|glad|slippery|ijs|ijzel)\b', 'Gladheid'),
+                (r'\b(sneeuw|snow|sneeuwval|winter)\b', 'Sneeuw'),
+                (r'\b(mist|fog|mistig|nebel|zicht)\b', 'Mist'),
+                (r'\b(regen|rain|regenbui|neerslag)\b', 'Regen'),
+                (r'\b(storm|wind|harde\s+wind|stormschade)\b', 'Storm'),
+                (r'\b(hagel|hail|hagelslag)\b', 'Hagel'),
+                
+                # Traffic volume and congestion (medium priority)
+                (r'\b(drukte|busy|traffic|verkeersdrukte)\b', 'Drukte'),
+                (r'\b(spitsuur|rush\s*hour|ochtendspits|avondspits)\b', 'Spitsuur'),
+                (r'\b(file|jam|verkeersjam|opstopping)\b', 'File'),
+                (r'\b(langzaam\s+verkeer|slow\s+traffic)\b', 'Langzaam verkeer'),
+                
+                # Events and special circumstances (lower priority)
+                (r'\b(evenement|event|manifestatie|festival)\b', 'Evenement'),
+                (r'\b(markt|market|braderie)\b', 'Markt'),
+                (r'\b(voetbal|football|soccer|wedstrijd|match)\b', 'Sportevenement'),
+                (r'\b(demonstratie|protest|march)\b', 'Demonstratie'),
+                
+                # Special road situations (lower priority)
+                (r'\b(omleid(?:ing)?|detour|omrijden)\b', 'Omleiding'),
+                (r'\b(grenscontrole|border\s+control|douane)\b', 'Grenscontrole'),
+                (r'\b(vracht(?:auto)?|truck|vrachtverkeer)\b', 'Vrachtverkeer'),
+                (r'\b(landbouwverkeer|tractors?|agrarisch)\b', 'Landbouwverkeer'),
+                
+                # Infrastructure issues
+                (r'\b(verkeerslich(?:t|ten)|traffic\s+light|stoplicht)\b', 'Verkeerslichten'),
+                (r'\b(wegdek|pavement|pothole|gat\s+in\s+(?:de\s+)?weg)\b', 'Wegdekprobleem'),
+                (r'\b(signaling|bebakening|afzetting)\b', 'Signalering'),
+                
+                # Time-specific causes
+                (r'\b(nacht(?:werk)?|night\s*work)\b', 'Nachtwerk'),
+                (r'\b(weekend(?:werk)?|weekend\s*work)\b', 'Weekendwerk'),
+                
+                # Emergency and special vehicles
+                (r'\b(politie(?:actie)?|police\s+action)\b', 'Politieactie'),
+                (r'\b(berging|recovery|sleepwagen|tow\s+truck)\b', 'Berging'),
+                (r'\b(schade|damage|beschadig(?:d|ing))\b', 'Schade'),
+            ]
+            
+            # Find the most specific cause
+            detected_causes = []
+            for pattern, cause_name in cause_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    # Add context information if available
+                    start = max(0, match.start() - 20)
+                    end = min(len(text), match.end() + 20)
+                    context = text[start:end].strip()
+                    
+                    detected_causes.append((cause_name, len(context), match.start()))
+            
+            if detected_causes:
+                # Sort by priority: longest context first, then earliest position
+                detected_causes.sort(key=lambda x: (-x[1], x[2]))
+                primary_cause = detected_causes[0][0]
+                
+                # Check for combined causes (e.g., "accident due to weather")
+                secondary_causes = [cause[0] for cause in detected_causes[1:3] 
+                                   if cause[0] != primary_cause]
+                
+                if secondary_causes:
+                    return f"{primary_cause} + {secondary_causes[0]}"
+                else:
+                    return primary_cause
+            
+            # Enhanced keyword analysis for implicit causes
+            # Look for delay indicators that might suggest cause
+            if any(word in text for word in ['vertraging', 'delay', 'slow', 'langzaam']):
+                if any(word in text for word in ['druk', 'busy', 'veel', 'verkeer']):
+                    return 'Drukte'
+                elif any(word in text for word in ['werk', 'onderhoud', 'repair']):
+                    return 'Wegwerkzaamheden'
+            
+            # Check for time-based indicators
+            import datetime
+            current_hour = datetime.datetime.now().hour
+            if 7 <= current_hour <= 9 or 16 <= current_hour <= 19:
+                if any(word in text for word in ['file', 'drukte', 'verkeer']):
+                    return 'Spitsuur'
+            
+            return "Oorzaak onbekend"
+            
+        except Exception as e:
+            print(f"Error extracting traffic cause: {e}")
+            return "Oorzaak onbekend"
+
     def _extract_detailed_direction_and_locations(self, text: str, direction_elements: list) -> tuple:
         """Extract detailed direction with source and destination locations"""
         direction = "Onbekende richting"
