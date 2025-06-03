@@ -1166,6 +1166,12 @@ class ANWBScraper:
                 if re.search(city_pattern, line):
                     result['city_line'] = line
                 
+                # Check for space-separated city patterns like "Breda   Rotterdam"
+                space_city_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s{2,}([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+                space_match = re.search(space_city_pattern, line)
+                if space_match and not result['city_line']:  # Only if not already found
+                    result['city_line'] = f"{space_match.group(1)} - {space_match.group(2)}"
+                
                 # Check for route/road information
                 if any(road in line for road in ['A59', 'A58', 'A50', 'A16', 'A73', 'A76', 'N2']):
                     result['route_info'] = line
