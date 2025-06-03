@@ -342,7 +342,7 @@ class ANWBScraper:
                 options.add_experimental_option("prefs", prefs)
                 
                 # Enhanced timeouts and error handling
-                service = webdriver.ChromeService()
+                service = webdriver.ChromeService(executable_path='/usr/bin/chromedriver')
                 service.creation_flags = 0x08000000  # CREATE_NO_WINDOW for Windows compatibility
                 
                 # Create driver with timeout handling
