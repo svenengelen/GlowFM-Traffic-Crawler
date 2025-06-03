@@ -3024,12 +3024,28 @@ async def scrape_optimized():
 
 @app.post("/api/traffic/refresh")
 async def refresh_traffic_data():
-    """Manually refresh traffic data using enhanced adaptive methods"""
+    """Manually refresh traffic data using enhanced adaptive methods with filelijst support"""
     try:
-        print("Manual refresh requested with adaptive methods")
+        print("Manual refresh requested with adaptive methods and filelijst support")
         scraper = ANWBScraper()
-        # Use the optimized scraping method for manual refresh too
+        
+        # First try the optimized scraping (includes main pages)
         result = await scraper.scrape_with_performance_optimization()
+        
+        # Additionally, specifically check filelijst for A58 and other traffic
+        print("Additional filelijst check for comprehensive traffic detection...")
+        filelijst_traffic = await scraper._playwright_scrape_traffic_async()
+        
+        if filelijst_traffic:
+            print(f"Found {len(filelijst_traffic)} additional traffic jams from filelijst")
+            # Store filelijst traffic data
+            await scraper._store_traffic_data_batch(filelijst_traffic)
+            
+            # Update result counts
+            result['traffic_jams'] += len(filelijst_traffic)
+            result['filelijst_traffic'] = len(filelijst_traffic)
+            result['message'] = f"Enhanced refresh: {result.get('traffic_jams', 0)} total traffic jams found (including {len(filelijst_traffic)} from filelijst)"
+        
         return result
     except Exception as e:
         print(f"Manual refresh failed: {e}")
