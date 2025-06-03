@@ -322,6 +322,9 @@ class ANWBScraper:
                 # Enhanced user agent for better compatibility
                 options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
                 
+                # Specify chromium binary explicitly
+                options.binary_location = '/usr/bin/chromium'
+                
                 # Window size for consistent rendering
                 options.add_argument('--window-size=1920,1080')
                 
