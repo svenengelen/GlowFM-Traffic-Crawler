@@ -3282,11 +3282,6 @@ async def refresh_traffic_data():
         print("Starting comprehensive filelijst scraper...")
         all_traffic_jams = await scraper._comprehensive_filelijst_scraper()
         
-        # Store the traffic data
-        if all_traffic_jams:
-            print(f"Storing {len(all_traffic_jams)} traffic jams...")
-            await scraper._store_traffic_data_batch(all_traffic_jams)
-        
         # Also try to get flitsers using the enhanced method
         flitsers = []
         try:
@@ -3301,10 +3296,8 @@ async def refresh_traffic_data():
         # Store the traffic data in the correct format for the main endpoint
         if all_traffic_jams:
             print(f"Storing {len(all_traffic_jams)} traffic jams...")
-            # Store in both the new format AND the legacy format that the main endpoint expects
-            await scraper._store_traffic_data_batch(all_traffic_jams)
             
-            # CRITICAL: Also store in the legacy format for the main endpoint
+            # CRITICAL: Store in the legacy format for the main endpoint
             traffic_data = {
                 'traffic_jams': all_traffic_jams,
                 'speed_cameras': flitsers,
@@ -3324,6 +3317,9 @@ async def refresh_traffic_data():
                 upsert=True
             )
             print(f"✅ Stored traffic data in legacy format for main endpoint compatibility")
+            
+            # Also store in both new collections for backward compatibility
+            await scraper._store_traffic_data_batch(all_traffic_jams)
         
         # Store flitser data if any
         if flitsers:
