@@ -1006,7 +1006,85 @@ class ANWBScraper:
             for road, count in road_summary.items():
                 print(f"  {road}: {count} jam(s)")
         
-        return all_traffic_jams
+    def _extract_city_names_from_text(self, text: str) -> tuple:
+        """Extract source and destination city names from traffic text"""
+        try:
+            # Enhanced patterns for Dutch city name extraction
+            # Look for pattern: "CityA CityB" or "CityA - CityB" or "van CityA naar CityB"
+            
+            # Known Dutch cities and places (expanded list)
+            dutch_cities = {
+                'amsterdam', 'rotterdam', 'utrecht', 'eindhoven', 'tilburg', 'groningen', 'almere',
+                'breda', 'nijmegen', 'enschede', 'haarlem', 'arnhem', 'amersfoort', 'zaanstad',
+                'venlo', 'weert', 'helmond', 'maastricht', 'sittard', 'heerlen', 'roermond',
+                'oss', 'uden', 'veghel', 'boxtel', 'vught', 'waalwijk', 'oosterhout', 
+                'bergen', 'roosendaal', 'goes', 'middelburg', 'terneuzen', 'vlissingen',
+                'dordrecht', 'delft', 'schiedam', 'leiden', 'hilversum', 'apeldoorn',
+                'deventer', 'zwolle', 'leeuwarden', 'emmen', 'hoogeveen', 'meppel',
+                'almelo', 'hengelo', 'oldenzaal', 'winterswijk', 'doetinchem', 'arnhem',
+                'gorinchem', 'cuijk', 'veenendaal', 'nieuwegein', 'woerden', 'montfoort',
+                'knoop', 'knooppunt', 'zonzeel', 'galder', 'klaverpolder', 'batadorp',
+                'belgische', 'grens', 'duitse', 'grens', 'velsertunnel', 'coentunnel'
+            }
+            
+            # Convert text to lowercase for processing
+            text_lower = text.lower()
+            
+            # Method 1: Look for "CityA CityB" pattern
+            words = text_lower.split()
+            cities_found = []
+            
+            for word in words:
+                # Clean word of punctuation
+                clean_word = re.sub(r'[^\w]', '', word)
+                if len(clean_word) >= 3 and clean_word in dutch_cities:
+                    cities_found.append(clean_word.capitalize())
+            
+            # Method 2: Look for specific patterns
+            direction_patterns = [
+                r'van\s+([A-Za-z]+)\s+naar\s+([A-Za-z]+)',  # "van X naar Y"
+                r'richting\s+([A-Za-z]+)',  # "richting X"
+                r'naar\s+([A-Za-z]+)',  # "naar X"
+                r'([A-Za-z]+)\s*[-→]\s*([A-Za-z]+)',  # "X - Y" or "X → Y"
+            ]
+            
+            for pattern in direction_patterns:
+                match = re.search(pattern, text_lower)
+                if match:
+                    groups = match.groups()
+                    for group in groups:
+                        if group and len(group) >= 3 and group in dutch_cities:
+                            cities_found.append(group.capitalize())
+            
+            # Method 3: Extract from common ANWB patterns like "A2 Maastricht Eindhoven"
+            road_city_pattern = r'[AN]\d+\s+([A-Za-z]+)\s+([A-Za-z]+)'
+            match = re.search(road_city_pattern, text)
+            if match:
+                city1, city2 = match.groups()
+                if city1.lower() in dutch_cities:
+                    cities_found.append(city1)
+                if city2.lower() in dutch_cities:
+                    cities_found.append(city2)
+            
+            # Remove duplicates while preserving order
+            unique_cities = []
+            seen = set()
+            for city in cities_found:
+                if city.lower() not in seen:
+                    unique_cities.append(city)
+                    seen.add(city.lower())
+            
+            # Return source and destination
+            if len(unique_cities) >= 2:
+                return unique_cities[0], unique_cities[1]
+            elif len(unique_cities) == 1:
+                return unique_cities[0], "Onbekend"
+            else:
+                return "Onbekend", "Onbekend"
+                
+        except Exception as e:
+            print(f"Error extracting city names: {e}")
+            return "Onbekend", "Onbekend"
 
     def _debug_page_structure(self, driver, page_type="traffic") -> None:
         """Debug function to analyze current page structure"""
