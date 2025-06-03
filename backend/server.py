@@ -2550,17 +2550,23 @@ async def get_speed_cameras(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving speed camera data: {str(e)}")
 
-@app.post("/api/traffic/refresh")
-async def refresh_traffic_data():
-    """Manually refresh traffic data"""
+@app.post("/api/scrape-optimized")
+async def scrape_optimized():
+    """Enhanced scraping endpoint with performance optimizations and adaptive extraction"""
     try:
-        # Run scraper in background thread to avoid blocking
-        threading.Thread(target=scrape_and_store_data, daemon=True).start()
-        
-        return {"message": "Traffic data refresh initiated", "timestamp": datetime.now()}
-        
+        print("Starting optimized ANWB scraping...")
+        scraper = ANWBScraper()
+        result = await scraper.scrape_with_performance_optimization()
+        return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error refreshing data: {str(e)}")
+        print(f"Optimized scraping failed: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'traffic_jams': 0,
+            'flitsers': 0,
+            'timestamp': int(time.time())
+        }
 
 @app.get("/api/roads")
 async def get_monitored_roads():
