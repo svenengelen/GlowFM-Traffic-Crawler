@@ -3443,6 +3443,10 @@ async def refresh_traffic_data():
         print("Starting comprehensive filelijst scraper...")
         all_traffic_jams = await scraper._comprehensive_filelijst_scraper()
         
+        # Ensure we have a valid list
+        if all_traffic_jams is None:
+            all_traffic_jams = []
+        
         # Also try to get flitsers using the enhanced method
         flitsers = []
         try:
