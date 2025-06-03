@@ -362,11 +362,11 @@ class ANWBScraper:
                         print("Using default chromedriver service")
                 
                 try:
-                    # Linux/Unix specific setup
+                    # Linux/Unix specific setup - no special flags needed
                     import platform
                     if platform.system() == "Windows":
                         service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
-                    # No special flags needed for Linux
+                    # Linux systems don't need creation_flags
                 except Exception as e:
                     print(f"Warning: Could not set service flags: {e}")
                 
