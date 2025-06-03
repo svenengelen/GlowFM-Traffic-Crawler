@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class ANWBTrafficTester:
-    def __init__(self, base_url="https://bc4668cd-3e1d-4a51-8563-9ce46c9a86d6.preview.emergentagent.com"):
+    def __init__(self, base_url="https://02a58650-437a-4820-b348-305719967aeb.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
