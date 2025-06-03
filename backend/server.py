@@ -2689,7 +2689,7 @@ async def test_a58_detection():
     try:
         print("🔍 Testing A58 traffic jam detection...")
         scraper = ANWBScraper()
-        traffic_jams = scraper._playwright_scrape_traffic()
+        traffic_jams = await scraper._playwright_scrape_traffic_async()
         
         return {
             'success': True,
