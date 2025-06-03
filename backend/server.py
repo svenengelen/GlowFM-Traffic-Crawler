@@ -560,6 +560,185 @@ class ANWBScraper:
             print(f"Error extracting detailed flitser info: {e}")
             return None
 
+    async def scrape_with_performance_optimization(self) -> dict:
+        """Enhanced scraping with performance optimizations and parallel processing"""
+        start_time = time.time()
+        
+        try:
+            print("Starting enhanced ANWB scraping with performance optimizations...")
+            
+            # Phase 1: Setup optimized driver sessions
+            traffic_driver = self._create_optimized_driver()
+            flitser_driver = self._create_optimized_driver() 
+            
+            try:
+                # Phase 2: Parallel scraping setup - prepare both sessions concurrently
+                print("Setting up parallel scraping sessions...")
+                setup_tasks = []
+                
+                # Setup traffic session
+                async def setup_traffic_session():
+                    try:
+                        traffic_driver.get("https://www.anwb.nl/verkeer")
+                        self._wait_for_page_load(traffic_driver, timeout=10)
+                        return True
+                    except Exception as e:
+                        print(f"Traffic session setup failed: {e}")
+                        return False
+                
+                # Setup flitser session  
+                async def setup_flitser_session():
+                    try:
+                        flitser_driver.get("https://www.anwb.nl/verkeer/flitsers")
+                        self._wait_for_page_load(flitser_driver, timeout=10)
+                        return True
+                    except Exception as e:
+                        print(f"Flitser session setup failed: {e}")
+                        return False
+                
+                # Execute setup tasks concurrently
+                import asyncio
+                traffic_ready, flitser_ready = await asyncio.gather(
+                    setup_traffic_session(),
+                    setup_flitser_session(),
+                    return_exceptions=True
+                )
+                
+                if not traffic_ready or not flitser_ready:
+                    print("Warning: Some sessions failed to initialize properly")
+                
+                # Phase 3: Optimized traffic jam extraction
+                print("Extracting traffic jams with fast strategy...")
+                traffic_start = time.time()
+                traffic_jams = self._extract_traffic_jams_fast(traffic_driver)
+                traffic_time = time.time() - traffic_start
+                print(f"Traffic extraction completed in {traffic_time:.2f}s - Found {len(traffic_jams)} jams")
+                
+                # Phase 4: Optimized flitser extraction
+                print("Extracting flitsers with enhanced strategy...")
+                flitser_start = time.time()
+                flitsers = self._extract_flitsers_enhanced_parallel(flitser_driver)
+                flitser_time = time.time() - flitser_start
+                print(f"Flitser extraction completed in {flitser_time:.2f}s - Found {len(flitsers)} flitsers")
+                
+                # Phase 5: Data processing and storage
+                processing_start = time.time()
+                
+                # Process traffic jams with enhanced data
+                processed_traffic = []
+                for jam in traffic_jams:
+                    try:
+                        # Enhanced processing with new methods
+                        enhanced_direction = self._extract_traffic_direction(jam.get('raw_text', ''))
+                        enhanced_cause = self._extract_traffic_cause(jam.get('raw_text', ''))
+                        
+                        processed_jam = {
+                            **jam,
+                            'enhanced_direction': enhanced_direction,
+                            'enhanced_cause': enhanced_cause,
+                            'processing_timestamp': int(time.time())
+                        }
+                        processed_traffic.append(processed_jam)
+                    except Exception as e:
+                        print(f"Error processing traffic jam: {e}")
+                        processed_traffic.append(jam)  # Keep original if processing fails
+                
+                # Process flitsers with enhanced location data  
+                processed_flitsers = []
+                for flitser in flitsers:
+                    try:
+                        # Enhanced processing with new methods
+                        enhanced_location = self._extract_flitser_location(
+                            flitser.get('raw_text', ''), 
+                            flitser.get('hectometer', '')
+                        )
+                        
+                        processed_flitser = {
+                            **flitser,
+                            'enhanced_location': enhanced_location,
+                            'processing_timestamp': int(time.time())
+                        }
+                        processed_flitsers.append(processed_flitser)
+                    except Exception as e:
+                        print(f"Error processing flitser: {e}")
+                        processed_flitsers.append(flitser)  # Keep original if processing fails
+                
+                processing_time = time.time() - processing_start
+                print(f"Data processing completed in {processing_time:.2f}s")
+                
+                # Phase 6: Concurrent database storage
+                storage_start = time.time()
+                
+                # Store data concurrently
+                async def store_traffic_data():
+                    try:
+                        await self._store_traffic_data_batch(processed_traffic)
+                        return len(processed_traffic)
+                    except Exception as e:
+                        print(f"Error storing traffic data: {e}")
+                        return 0
+                
+                async def store_flitser_data():
+                    try:
+                        await self._store_flitser_data_batch(processed_flitsers)
+                        return len(processed_flitsers)
+                    except Exception as e:
+                        print(f"Error storing flitser data: {e}")
+                        return 0
+                
+                stored_traffic, stored_flitsers = await asyncio.gather(
+                    store_traffic_data(),
+                    store_flitser_data(),
+                    return_exceptions=True
+                )
+                
+                storage_time = time.time() - storage_start
+                print(f"Data storage completed in {storage_time:.2f}s")
+                
+                total_time = time.time() - start_time
+                
+                return {
+                    'success': True,
+                    'traffic_jams': len(processed_traffic),
+                    'flitsers': len(processed_flitsers),
+                    'stored_traffic': stored_traffic if isinstance(stored_traffic, int) else 0,
+                    'stored_flitsers': stored_flitsers if isinstance(stored_flitsers, int) else 0,
+                    'performance': {
+                        'total_time': round(total_time, 2),
+                        'traffic_time': round(traffic_time, 2),
+                        'flitser_time': round(flitser_time, 2), 
+                        'processing_time': round(processing_time, 2),
+                        'storage_time': round(storage_time, 2),
+                        'avg_traffic_per_second': round(len(processed_traffic) / traffic_time, 2) if traffic_time > 0 else 0,
+                        'avg_flitser_per_second': round(len(processed_flitsers) / flitser_time, 2) if flitser_time > 0 else 0
+                    },
+                    'timestamp': int(time.time())
+                }
+                
+            finally:
+                # Cleanup drivers
+                try:
+                    traffic_driver.quit()
+                except:
+                    pass
+                try:
+                    flitser_driver.quit()
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"Enhanced scraping failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'traffic_jams': 0,
+                'flitsers': 0,
+                'performance': {
+                    'total_time': round(time.time() - start_time, 2)
+                },
+                'timestamp': int(time.time())
+            }
+
     def _extract_flitser_direction(self, text: str) -> str:
         """Extract direction information from flitser text"""
         try:
