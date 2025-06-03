@@ -350,7 +350,7 @@ class ANWBScraper:
                     print(f"System chromedriver failed: {e}")
                     try:
                         # Fallback to webdriver-manager
-                        service = ChromeService(ChromeDriverManager().install())
+                        service = Service(ChromeDriverManager().install())
                         print("Using webdriver-manager for chromedriver")
                     except Exception as e2:
                         print(f"Webdriver-manager failed: {e2}")
