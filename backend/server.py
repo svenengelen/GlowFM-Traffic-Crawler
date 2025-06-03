@@ -1378,8 +1378,23 @@ class ANWBScraper:
                 if match:
                     groups = match.groups()
                     for group in groups:
-                        if group and len(group) >= 3 and group in dutch_cities:
-                            cities_found.append(group.capitalize())
+                        if group:
+                            # Handle multi-word locations and clean them
+                            cleaned_group = group.strip()
+                            # Check if it's a distance/hectometer value
+                            if re.match(r'^\d+(?:\.\d+)?$', cleaned_group):
+                                continue  # Skip numeric values for city extraction
+                            
+                            # Split multi-word locations and check each word
+                            words_in_group = cleaned_group.split()
+                            for word in words_in_group:
+                                clean_word = re.sub(r'[^\w]', '', word)
+                                if len(clean_word) >= 3 and clean_word in dutch_cities:
+                                    cities_found.append(clean_word.capitalize())
+                            
+                            # Also add the full group if it contains known patterns
+                            if any(word in dutch_cities for word in words_in_group):
+                                cities_found.append(cleaned_group.title())
             
             # Method 3: Extract from common ANWB patterns like "A2 Maastricht Eindhoven"
             road_city_pattern = r'[AN]\d+\s+([A-Za-z]+)\s+([A-Za-z]+)'
