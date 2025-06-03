@@ -196,6 +196,13 @@ function App() {
                 Alles Wissen
               </button>
               <button
+                onClick={handleEnhancedRefresh}
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {loading ? '⚡ Geavanceerd...' : '⚡ Geavanceerd'}
+              </button>
+              <button
                 onClick={handleRefresh}
                 disabled={loading}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
