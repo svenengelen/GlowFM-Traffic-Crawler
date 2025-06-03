@@ -55,6 +55,15 @@ class TrafficJam(BaseModel):
     delay_minutes: int
     length_km: float
     last_updated: datetime
+    
+    # Enhanced formatting fields
+    formatted_delay: Optional[str] = None
+    direction_line: Optional[str] = None
+    city_line: Optional[str] = None
+    route_info: Optional[str] = None
+    enhanced_direction: Optional[str] = None
+    enhanced_cause: Optional[str] = None
+    raw_text: Optional[str] = None
 
 class SpeedCamera(BaseModel):
     id: str
