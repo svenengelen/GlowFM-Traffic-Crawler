@@ -2705,6 +2705,8 @@ async def test_a58_detection():
             'traffic_jams': 0,
             'timestamp': int(time.time())
         }
+
+@app.post("/api/scrape-optimized")
 async def scrape_optimized():
     """Enhanced scraping endpoint with performance optimizations and adaptive extraction"""
     try:
