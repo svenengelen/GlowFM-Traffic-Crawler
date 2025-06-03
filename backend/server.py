@@ -1177,7 +1177,7 @@ class ANWBScraper:
                 print("Setting up parallel scraping sessions...")
                 setup_tasks = []
                 
-                # Setup traffic session
+                # Setup traffic session for main page
                 async def setup_traffic_session():
                     try:
                         traffic_driver.get("https://www.anwb.nl/verkeer")
@@ -1186,6 +1186,18 @@ class ANWBScraper:
                     except Exception as e:
                         print(f"Traffic session setup failed: {e}")
                         return False
+                
+                # Setup traffic session for filelijst page (where A58 traffic is shown)
+                async def setup_filelijst_session():
+                    try:
+                        # Create additional driver for filelijst page
+                        filelijst_driver = self._create_optimized_driver()
+                        filelijst_driver.get("https://www.anwb.nl/verkeer/filelijst")
+                        self._wait_for_page_load(filelijst_driver, timeout=10)
+                        return filelijst_driver
+                    except Exception as e:
+                        print(f"Filelijst session setup failed: {e}")
+                        return None
                 
                 # Setup flitser session  
                 async def setup_flitser_session():
