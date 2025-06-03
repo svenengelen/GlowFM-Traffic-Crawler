@@ -956,47 +956,76 @@ class ANWBScraper:
                             destination_location = match.group(1).strip()
                     break
             
-            # Fallback to text-based extraction
+            # Enhanced text-based extraction with better patterns
             if direction == "Onbekende richting":
-                text_lower = text.lower()
+                text_lines = text.split('\n')
                 
-                # Look for "van X richting Y" or "richting Y vanaf X" patterns
-                patterns = [
-                    r'van\s+([^→\n,]+?)\s+richting\s+([^→\n,]+)',
-                    r'richting\s+([^→\n,]+?)\s+vanaf\s+([^→\n,]+)',
-                    r'([^→\n,]+?)\s*→\s*([^→\n,]+)',
-                    r'vanaf\s+([^→\n,]+?)\s+naar\s+([^→\n,]+)'
-                ]
+                # Look for clear direction indicators in the text
+                for line in text_lines:
+                    line_clean = line.strip()
+                    if not line_clean:
+                        continue
+                    
+                    # Pattern 1: "richting [city]"
+                    if 'richting' in line_clean.lower():
+                        match = re.search(r'richting\s+([^→\n,\.;]+)', line_clean, re.IGNORECASE)
+                        if match:
+                            dest = match.group(1).strip()
+                            destination_location = dest
+                            direction = f"richting {dest}"
+                            print(f"Found direction from 'richting': {direction}")
+                            break
+                    
+                    # Pattern 2: "naar [city]" 
+                    elif 'naar' in line_clean.lower() and len(line_clean) < 50:  # Short lines more likely to be directions
+                        match = re.search(r'naar\s+([^→\n,\.;]+)', line_clean, re.IGNORECASE)
+                        if match:
+                            dest = match.group(1).strip()
+                            destination_location = dest
+                            direction = f"richting {dest}"
+                            print(f"Found direction from 'naar': {direction}")
+                            break
+                    
+                    # Pattern 3: Arrow notation "A → B"
+                    elif '→' in line_clean:
+                        parts = line_clean.split('→')
+                        if len(parts) == 2:
+                            source_location = parts[0].strip()
+                            destination_location = parts[1].strip()
+                            direction = f"van {source_location} richting {destination_location}"
+                            print(f"Found direction from arrow: {direction}")
+                            break
                 
-                for pattern in patterns:
-                    match = re.search(pattern, text, re.IGNORECASE)
-                    if match:
-                        if 'van' in pattern or 'vanaf' in pattern:
-                            source_location = match.group(1).strip()
-                            destination_location = match.group(2).strip()
-                        else:
-                            destination_location = match.group(1).strip()
-                            source_location = match.group(2).strip()
-                        direction = f"van {source_location} richting {destination_location}"
-                        break
-                
-                # If still no direction found, look for simple "richting X"
+                # If still no direction found, look for city names that are likely destinations
                 if direction == "Onbekende richting":
-                    match = re.search(r'richting\s+([^→\n,]+)', text_lower)
-                    if match:
-                        destination_location = match.group(1).strip()
-                        direction = f"richting {destination_location}"
-                
-                # Look for major cities that indicate direction
-                direction_cities = ['eindhoven', 'venlo', 'utrecht', 'amsterdam', 'rotterdam', 'breda', 'tilburg', 'nijmegen', 'maastricht', "'s-hertogenbosch"]
-                for city in direction_cities:
-                    if city in text_lower and destination_location == "Onbekend":
-                        destination_location = city.title()
-                        direction = f"richting {destination_location}"
-                        break
+                    # Major Dutch cities that are likely destinations
+                    major_cities = [
+                        'maastricht', 'eindhoven', 'venlo', 'utrecht', 'amsterdam', 
+                        'rotterdam', 'breda', 'tilburg', 'nijmegen', "'s-hertogenbosch",
+                        'weert', 'roermond', 'heerlen', 'sittard', 'geleen'
+                    ]
+                    
+                    text_lower = text.lower()
+                    for city in major_cities:
+                        if city in text_lower:
+                            # Check if this city appears in a context that suggests it's a destination
+                            city_context = re.search(f'.{{0,30}}{city}.{{0,30}}', text_lower)
+                            if city_context:
+                                context = city_context.group(0)
+                                if any(indicator in context for indicator in ['richting', 'naar', '→']):
+                                    destination_location = city.title()
+                                    direction = f"richting {destination_location}"
+                                    print(f"Found direction from city context: {direction}")
+                                    break
                         
         except Exception as e:
             print(f"Error extracting detailed direction: {e}")
+        
+        # Clean up the extracted values
+        if destination_location and destination_location != "Onbekend":
+            destination_location = destination_location.replace("'s-", "'s-").title()
+        if source_location and source_location != "Onbekend":
+            source_location = source_location.replace("'s-", "'s-").title()
         
         return direction, source_location, destination_location
 
