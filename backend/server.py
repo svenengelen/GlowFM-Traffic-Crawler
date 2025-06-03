@@ -662,7 +662,39 @@ class ANWBScraper:
                                 if 'A58' in element_text:
                                     print(f"🎯 Found A58 clickable element: {element_text}")
                                     
-                                    # Try clicking to expand
+                                    # Check for delay patterns DIRECTLY in the clickable element text
+                                    delay_match = re.search(r'\+\s*(\d+)\s*min', element_text)
+                                    if delay_match:
+                                        delay_minutes = int(delay_match.group(1))
+                                        print(f"🚨 FOUND A58 DELAY IN ELEMENT: {delay_minutes} minutes")
+                                        
+                                        # Extract length too
+                                        length_match = re.search(r'(\d+)\s*km', element_text)
+                                        length_km = float(length_match.group(1)) if length_match else 0.0
+                                        
+                                        print(f"📋 A58 Traffic Details: {element_text}")
+                                        
+                                        traffic_jam = {
+                                            'id': f"A58_filelijst_{int(time.time())}",
+                                            'road': 'A58',
+                                            'direction': self._extract_traffic_direction(element_text),
+                                            'source_location': "Filelijst clickable element",
+                                            'destination_location': "Filelijst clickable element",
+                                            'route_details': element_text.replace('\n', ' ').strip(),
+                                            'cause': self._extract_traffic_cause(element_text),
+                                            'delay_minutes': delay_minutes,
+                                            'length_km': length_km,
+                                            'raw_text': element_text.replace('\n', ' ').strip(),
+                                            'enhanced_direction': self._extract_traffic_direction(element_text),
+                                            'enhanced_cause': self._extract_traffic_cause(element_text),
+                                            'last_updated': datetime.now()
+                                        }
+                                        traffic_jams.append(traffic_jam)
+                                        print(f"🎉 SUCCESSFULLY DETECTED A58 TRAFFIC JAM: {delay_minutes}min, {length_km}km!")
+                                        break  # Found it, no need to click
+                                    
+                                    # If no delay found in element text, try clicking to expand
+                                    print("No delay in element text, trying to click for more details...")
                                     await element.click()
                                     await page.wait_for_timeout(2000)  # Wait 2 seconds
                                     
