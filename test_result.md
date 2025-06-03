@@ -202,12 +202,14 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Identify specific enhancement areas for flitser detection"
-    - "Identify specific enhancement areas for traffic jam detection"
+    - "Better location precision (exact kilometer markers, junction names)"
+    - "Improved traffic cause detection (accidents, roadworks, weather)"
+    - "Faster scraping with parallel processing"
+    - "Better error handling and fallback mechanisms"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     - agent: "main"
-      message: "Application successfully started. Current state analyzed. Enhanced flitser and traffic jam detection already implemented. Need user input on specific enhancement priorities to continue development."
+      message: "User confirmed specific enhancement focus: 1) Better location precision, 2) Improved traffic cause detection, 3) Faster scraping, 4) Better error handling. Flitser detection should remain focused only on dynamic speed cameras. Starting with Phase 1: Better Location Precision."
