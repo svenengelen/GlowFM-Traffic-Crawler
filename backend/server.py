@@ -859,6 +859,9 @@ class ANWBScraper:
                                     # Extract city names from the text
                                     source_city, dest_city = self._extract_city_names_from_text(element_text)
                                     
+                                    # Extract detailed traffic information for better formatting
+                                    detailed_info = self._extract_detailed_traffic_info(element_text)
+                                    
                                     # Check for delay patterns DIRECTLY in the clickable element text (A58 pattern)
                                     delay_match = re.search(r'\+\s*(\d+)\s*min', element_text)
                                     multiple_pattern = re.search(r'(\d+)\s*\+\s*(\d+)\s*min\s*(\d+)\s*km', element_text)
@@ -880,13 +883,18 @@ class ANWBScraper:
                                                 'direction': self._extract_traffic_direction(element_text),
                                                 'source_location': source_city,
                                                 'destination_location': dest_city,
-                                                'route_details': f"{element_text_clean} (file {jam_index+1}/{jam_count})",
+                                                'route_details': detailed_info['clean_delay_text'],
                                                 'cause': self._extract_traffic_cause(element_text),
                                                 'delay_minutes': delay_per_jam,
                                                 'length_km': avg_length,
                                                 'raw_text': element_text_clean,
                                                 'enhanced_direction': self._extract_traffic_direction(element_text),
                                                 'enhanced_cause': self._extract_traffic_cause(element_text),
+                                                # Enhanced formatting information
+                                                'direction_line': detailed_info['direction_line'],
+                                                'city_line': detailed_info['city_line'],
+                                                'route_info': detailed_info['route_info'],
+                                                'formatted_delay': f"+ {delay_per_jam} min",
                                                 'last_updated': datetime.now()
                                             }
                                             all_traffic_jams.append(traffic_jam)
@@ -909,13 +917,18 @@ class ANWBScraper:
                                             'direction': self._extract_traffic_direction(element_text),
                                             'source_location': source_city,
                                             'destination_location': dest_city,
-                                            'route_details': element_text_clean,
+                                            'route_details': detailed_info['clean_delay_text'],
                                             'cause': self._extract_traffic_cause(element_text),
                                             'delay_minutes': delay_minutes,
                                             'length_km': length_km,
                                             'raw_text': element_text_clean,
                                             'enhanced_direction': self._extract_traffic_direction(element_text),
                                             'enhanced_cause': self._extract_traffic_cause(element_text),
+                                            # Enhanced formatting information
+                                            'direction_line': detailed_info['direction_line'],
+                                            'city_line': detailed_info['city_line'],
+                                            'route_info': detailed_info['route_info'],
+                                            'formatted_delay': f"+ {delay_minutes} min",
                                             'last_updated': datetime.now()
                                         }
                                         all_traffic_jams.append(traffic_jam)
