@@ -1297,13 +1297,14 @@ class ANWBScraper:
         return individual_jams
         
     def _extract_city_names_from_text(self, text: str) -> tuple:
-        """Extract source and destination city names from traffic text"""
+        """Extract source and destination city names from traffic text with enhanced location precision"""
         try:
             # Enhanced patterns for Dutch city name extraction
             # Look for pattern: "CityA CityB" or "CityA - CityB" or "van CityA naar CityB"
             
-            # Known Dutch cities and places (expanded list)
+            # Comprehensive Dutch cities, junctions, and locations (enhanced for better precision)
             dutch_cities = {
+                # Major cities
                 'amsterdam', 'rotterdam', 'utrecht', 'eindhoven', 'tilburg', 'groningen', 'almere',
                 'breda', 'nijmegen', 'enschede', 'haarlem', 'arnhem', 'amersfoort', 'zaanstad',
                 'venlo', 'weert', 'helmond', 'maastricht', 'sittard', 'heerlen', 'roermond',
@@ -1311,10 +1312,32 @@ class ANWBScraper:
                 'bergen', 'roosendaal', 'goes', 'middelburg', 'terneuzen', 'vlissingen',
                 'dordrecht', 'delft', 'schiedam', 'leiden', 'hilversum', 'apeldoorn',
                 'deventer', 'zwolle', 'leeuwarden', 'emmen', 'hoogeveen', 'meppel',
-                'almelo', 'hengelo', 'oldenzaal', 'winterswijk', 'doetinchem', 'arnhem',
+                'almelo', 'hengelo', 'oldenzaal', 'winterswijk', 'doetinchem',
                 'gorinchem', 'cuijk', 'veenendaal', 'nieuwegein', 'woerden', 'montfoort',
+                
+                # Enhanced regional locations and junctions
                 'knoop', 'knooppunt', 'zonzeel', 'galder', 'klaverpolder', 'batadorp',
-                'belgische', 'grens', 'duitse', 'grens', 'velsertunnel', 'coentunnel'
+                'belgische', 'grens', 'duitse', 'grens', 'velsertunnel', 'coentunnel',
+                
+                # Enhanced Brabant/Limburg specific locations
+                'made', 'waspik', 'drunen', 'kaatsheuvel', 'loon', 'raamsdonksveer',
+                'geertruidenberg', 'gilze', 'rijen', 'dongen', 'udenhout', 'best',
+                'son', 'breugel', 'nuenen', 'geldrop', 'mierlo', 'lierop', 'someren',
+                'asten', 'deurne', 'vlierden', 'meijel', 'griendtsveen', 'america',
+                'horst', 'sevenum', 'helden', 'panningen', 'reuver', 'beesel',
+                'swalmen', 'tegelen', 'belfeld', 'velden', 'grubbenvorst',
+                
+                # Enhanced highway junctions and interchanges
+                'interchange', 'knooppunt', 'verkeersplein', 'rotonde', 'klaverblad',
+                'kruispunt', 'aansluiting', 'afritte', 'oprit', 'verzorgingsplaats',
+                
+                # Specific highway locations and hectometer references
+                'hectometer', 'hm', 'km', 'mijlpaal', 'afstand', 'markering',
+                'viaduct', 'brug', 'tunnel', 'fly-over', 'onderdoorgang',
+                
+                # Border and international locations
+                'antwerpen', 'turnhout', 'mol', 'hasselt', 'luik', 'aken', 'düsseldorf',
+                'venray', 'boxmeer', 'grave', 'mook', 'berg', 'wyler', 'kranenburg'
             }
             
             # Convert text to lowercase for processing
