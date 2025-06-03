@@ -1160,6 +1160,8 @@ class ANWBScraper:
             self.logger.error(f"❌ Error in direct text extraction for {road}: {e}")
             
         return results
+
+    async def _comprehensive_filelijst_scraper(self) -> List[Dict]:
         """Comprehensive filelijst scraper for ALL monitored roads using successful A58 pattern"""
         all_traffic_jams = []
         
