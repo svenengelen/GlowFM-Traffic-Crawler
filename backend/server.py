@@ -1124,6 +1124,56 @@ class ANWBScraper:
             print(f"Error extracting city names: {e}")
             return "Onbekend", "Onbekend"
 
+    def _extract_detailed_traffic_info(self, element_text: str) -> dict:
+        """Extract detailed traffic information including direction lines and city information"""
+        try:
+            lines = element_text.split('\n')
+            result = {
+                'direction_line': '',
+                'city_line': '',
+                'route_info': '',
+                'clean_delay_text': element_text
+            }
+            
+            # Process each line to extract different types of information
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Check for direction lines (knp./knooppunt patterns)
+                direction_indicators = ['knp.', 'knooppunt', 'aansluiting', '->', '→', 'richting']
+                if any(indicator in line.lower() for indicator in direction_indicators):
+                    # Format direction line: change "->" to "ri."
+                    formatted_direction = line.replace('->', 'ri.').replace('→', 'ri.')
+                    result['direction_line'] = formatted_direction
+                
+                # Check for city lines (City - City patterns)
+                city_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[-–]\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)'
+                if re.search(city_pattern, line):
+                    result['city_line'] = line
+                
+                # Check for route/road information
+                if any(road in line for road in ['A59', 'A58', 'A50', 'A16', 'A73', 'A76', 'N2']):
+                    result['route_info'] = line
+            
+            # Clean the delay text - remove count numbers from patterns like "2 + 14 min"
+            clean_text = element_text
+            # Pattern to remove count before + sign: "2 + 14 min" becomes "+ 14 min"
+            clean_text = re.sub(r'\b(\d+)\s*\+\s*(\d+)\s*min', r'+ \2 min', clean_text)
+            result['clean_delay_text'] = clean_text
+            
+            return result
+            
+        except Exception as e:
+            print(f"Error extracting detailed traffic info: {e}")
+            return {
+                'direction_line': '',
+                'city_line': '',
+                'route_info': element_text,
+                'clean_delay_text': element_text
+            }
+
     def _debug_page_structure(self, driver, page_type="traffic") -> None:
         """Debug function to analyze current page structure"""
         try:
