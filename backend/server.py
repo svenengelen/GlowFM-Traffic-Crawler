@@ -84,6 +84,8 @@ class ANWBScraper:
     def __init__(self):
         self.base_url = "https://anwb.nl/verkeer/filelijst"
         self.driver = None
+        # Initialize database connection
+        self.db = db
         
     def _setup_driver(self):
         """Set up Selenium WebDriver with Chromium"""
