@@ -588,6 +588,320 @@ class ANWBTrafficTester:
             
         return total_jams > 0
 
+    def test_enhanced_location_precision(self):
+        """Test the enhanced location precision features"""
+        print("\n🔍 Testing Enhanced Location Precision...")
+        
+        success, response = self.run_test(
+            "Traffic Data for Location Precision Analysis",
+            "GET",
+            "traffic",
+            200
+        )
+        
+        if not success:
+            print("❌ Failed to get traffic data for location precision analysis")
+            return False
+            
+        traffic_jams = response.get('traffic_jams', [])
+        if not traffic_jams:
+            print("ℹ️ No traffic jams found - cannot verify location precision")
+            return True
+            
+        # Check for hectometer information
+        hectometer_found = False
+        for jam in traffic_jams:
+            route_details = jam.get('route_details', '')
+            for pattern in self.hectometer_patterns:
+                import re
+                if re.search(pattern, route_details, re.IGNORECASE):
+                    hectometer_found = True
+                    print(f"✅ Found hectometer information: '{re.search(pattern, route_details, re.IGNORECASE).group(0)}' in: {route_details}")
+                    break
+            if hectometer_found:
+                break
+                
+        if not hectometer_found:
+            print("⚠️ No hectometer information found in any traffic jam")
+            
+        # Check for junction/exit terms
+        junction_found = False
+        for jam in traffic_jams:
+            route_details = jam.get('route_details', '')
+            for term in self.junction_terms:
+                if term in route_details.lower():
+                    junction_found = True
+                    print(f"✅ Found junction/exit term: '{term}' in: {route_details}")
+                    break
+            if junction_found:
+                break
+                
+        if not junction_found:
+            print("⚠️ No junction/exit terms found in any traffic jam")
+            
+        # Check for "between X and Y" location descriptions
+        between_locations_found = False
+        for jam in traffic_jams:
+            route_details = jam.get('route_details', '')
+            if 'tussen' in route_details.lower() and 'en' in route_details.lower():
+                between_locations_found = True
+                print(f"✅ Found 'between X and Y' description: {route_details}")
+                break
+                
+        if not between_locations_found:
+            print("⚠️ No 'between X and Y' location descriptions found")
+            
+        # Check for city names in location data
+        cities_in_locations = []
+        for jam in traffic_jams:
+            source = jam.get('source_location', '').lower()
+            dest = jam.get('destination_location', '').lower()
+            route = jam.get('route_details', '').lower()
+            
+            for city in self.expected_cities:
+                city_lower = city.lower()
+                if city_lower in source or city_lower in dest or city_lower in route:
+                    if city not in cities_in_locations:
+                        cities_in_locations.append(city)
+        
+        if cities_in_locations:
+            print(f"✅ Found {len(cities_in_locations)} cities in location data: {', '.join(cities_in_locations)}")
+        else:
+            print("⚠️ No expected cities found in location data")
+            
+        # Overall assessment
+        location_features_found = sum([hectometer_found, junction_found, between_locations_found, len(cities_in_locations) > 0])
+        if location_features_found >= 2:  # At least 2 location features should be found
+            print("✅ Enhanced location precision features are working")
+            return True
+        else:
+            print("❌ Enhanced location precision features may not be fully implemented")
+            return False
+            
+    def test_improved_traffic_cause_detection(self):
+        """Test the improved traffic cause detection features"""
+        print("\n🔍 Testing Improved Traffic Cause Detection...")
+        
+        success, response = self.run_test(
+            "Traffic Data for Cause Analysis",
+            "GET",
+            "traffic",
+            200
+        )
+        
+        if not success:
+            print("❌ Failed to get traffic data for cause analysis")
+            return False
+            
+        traffic_jams = response.get('traffic_jams', [])
+        if not traffic_jams:
+            print("ℹ️ No traffic jams found - cannot verify cause detection")
+            return True
+            
+        # Check for different cause categories
+        cause_categories_found = {category: False for category in self.traffic_cause_terms.keys()}
+        cause_examples = {}
+        
+        for jam in traffic_jams:
+            cause = jam.get('cause', '').lower()
+            if not cause or cause == 'oorzaak onbekend':
+                continue
+                
+            for category, terms in self.traffic_cause_terms.items():
+                for term in terms:
+                    if term in cause:
+                        cause_categories_found[category] = True
+                        cause_examples[category] = cause
+                        break
+        
+        # Report findings
+        for category, found in cause_categories_found.items():
+            if found:
+                print(f"✅ Found {category} cause: '{cause_examples[category]}'")
+            else:
+                print(f"⚠️ No {category} causes found")
+                
+        # Check for combined causes (e.g., "accident due to weather")
+        combined_causes_found = False
+        for jam in traffic_jams:
+            cause = jam.get('cause', '').lower()
+            categories_in_cause = []
+            
+            for category, terms in self.traffic_cause_terms.items():
+                for term in terms:
+                    if term in cause:
+                        categories_in_cause.append(category)
+                        break
+                        
+            if len(categories_in_cause) >= 2:
+                combined_causes_found = True
+                print(f"✅ Found combined cause ({'+'.join(categories_in_cause)}): '{cause}'")
+                break
+                
+        if not combined_causes_found:
+            print("⚠️ No combined causes found")
+            
+        # Overall assessment
+        causes_found_count = sum(1 for found in cause_categories_found.values() if found)
+        if causes_found_count >= 2 or combined_causes_found:  # At least 2 cause categories or a combined cause
+            print("✅ Improved traffic cause detection is working")
+            return True
+        else:
+            print("❌ Improved traffic cause detection may not be fully implemented")
+            return False
+            
+    def test_enhanced_error_handling(self):
+        """Test the enhanced error handling features"""
+        print("\n🔍 Testing Enhanced Error Handling...")
+        
+        # Test with invalid parameters to check error handling
+        success, response = self.run_test(
+            "Error Handling - Invalid Road Parameter",
+            "GET",
+            "traffic",
+            200,  # Should still return 200 with empty results, not 500
+            params={"road": "INVALID_ROAD_XYZ"}
+        )
+        
+        if not success:
+            print("❌ Failed basic error handling test - server error on invalid parameter")
+            return False
+            
+        # Check that response is well-formed even with invalid input
+        if 'traffic_jams' in response and isinstance(response['traffic_jams'], list):
+            print("✅ Server handles invalid road parameter gracefully")
+        else:
+            print("❌ Server response is malformed with invalid parameter")
+            return False
+            
+        # Test with invalid city parameter
+        success, response = self.run_test(
+            "Error Handling - Invalid City Parameter",
+            "GET",
+            "traffic",
+            200,  # Should still return 200 with empty results, not 500
+            params={"city": "NONEXISTENT_CITY_XYZ"}
+        )
+        
+        if not success:
+            print("❌ Failed city error handling test - server error on invalid parameter")
+            return False
+            
+        # Check that response is well-formed even with invalid input
+        if 'traffic_jams' in response and isinstance(response['traffic_jams'], list):
+            print("✅ Server handles invalid city parameter gracefully")
+        else:
+            print("❌ Server response is malformed with invalid city parameter")
+            return False
+            
+        # Test with multiple invalid parameters
+        success, response = self.run_test(
+            "Error Handling - Multiple Invalid Parameters",
+            "GET",
+            "traffic",
+            200,  # Should still return 200 with empty results, not 500
+            params={"road": "INVALID_ROAD_XYZ", "city": "NONEXISTENT_CITY_XYZ", "min_delay": "not_a_number"}
+        )
+        
+        if not success:
+            print("❌ Failed multiple error handling test - server error on invalid parameters")
+            return False
+            
+        # Check that response is well-formed even with invalid input
+        if 'traffic_jams' in response and isinstance(response['traffic_jams'], list):
+            print("✅ Server handles multiple invalid parameters gracefully")
+        else:
+            print("❌ Server response is malformed with multiple invalid parameters")
+            return False
+            
+        print("✅ Enhanced error handling is working properly")
+        return True
+        
+    def test_performance_optimizations(self):
+        """Test the performance optimizations"""
+        print("\n🔍 Testing Performance Optimizations...")
+        
+        # Check if optimized endpoint exists
+        success, response = self.run_test(
+            "Optimized Scraping Endpoint",
+            "GET",
+            "scrape-optimized",
+            200
+        )
+        
+        optimized_endpoint_exists = success
+        
+        if not optimized_endpoint_exists:
+            print("ℹ️ Optimized scraping endpoint not found - testing regular endpoint performance")
+            
+        # Test regular endpoint performance
+        import time
+        start_time = time.time()
+        
+        success, response = self.run_test(
+            "Regular Traffic Endpoint Performance",
+            "GET",
+            "traffic",
+            200
+        )
+        
+        regular_endpoint_time = time.time() - start_time
+        print(f"ℹ️ Regular traffic endpoint response time: {regular_endpoint_time:.2f} seconds")
+        
+        if not success:
+            print("❌ Failed to test regular endpoint performance")
+            return False
+            
+        # If optimized endpoint exists, test its performance
+        if optimized_endpoint_exists:
+            start_time = time.time()
+            
+            success, response = self.run_test(
+                "Optimized Endpoint Performance",
+                "GET",
+                "scrape-optimized",
+                200
+            )
+            
+            optimized_endpoint_time = time.time() - start_time
+            print(f"ℹ️ Optimized endpoint response time: {optimized_endpoint_time:.2f} seconds")
+            
+            if not success:
+                print("❌ Failed to test optimized endpoint performance")
+                return False
+                
+            # Compare performance
+            if optimized_endpoint_time < regular_endpoint_time:
+                print(f"✅ Optimized endpoint is faster by {(regular_endpoint_time - optimized_endpoint_time):.2f} seconds")
+            else:
+                print(f"⚠️ Optimized endpoint is not faster than regular endpoint")
+        
+        # Test refresh endpoint performance
+        start_time = time.time()
+        
+        success, response = self.run_test(
+            "Refresh Endpoint Performance",
+            "POST",
+            "traffic/refresh",
+            200
+        )
+        
+        refresh_endpoint_time = time.time() - start_time
+        print(f"ℹ️ Refresh endpoint response time: {refresh_endpoint_time:.2f} seconds")
+        
+        if not success:
+            print("❌ Failed to test refresh endpoint performance")
+            return False
+            
+        # Check if refresh is asynchronous (should return quickly)
+        if refresh_endpoint_time < 1.0:
+            print("✅ Refresh endpoint returns quickly (likely asynchronous)")
+        else:
+            print("⚠️ Refresh endpoint is slow to respond (may not be fully asynchronous)")
+            
+        print("✅ Performance testing completed successfully")
+        return True
+
 def main():
     # Setup
     tester = ANWBTrafficTester()
@@ -598,7 +912,7 @@ def main():
         tester.test_traffic_endpoint,
         tester.test_traffic_jam_data_structure,
         tester.test_a67_traffic_jam,
-        tester.test_a270_traffic_jam,  # Added A270 specific test
+        tester.test_a270_traffic_jam,
         tester.test_roads_endpoint,
         tester.test_cities_endpoint,
         tester.test_refresh_endpoint,
@@ -609,8 +923,13 @@ def main():
         tester.test_speed_cameras_in_traffic_endpoint,
         tester.test_speed_camera_data_structure,
         tester.test_speed_camera_filtering,
+        # Enhanced feature tests
+        tester.test_enhanced_location_precision,
+        tester.test_improved_traffic_cause_detection,
+        tester.test_enhanced_error_handling,
+        tester.test_performance_optimizations,
         # Scraper test
-        tester.test_scraper_refresh  # Added scraper refresh test
+        tester.test_scraper_refresh
     ]
     
     for test in tests:
