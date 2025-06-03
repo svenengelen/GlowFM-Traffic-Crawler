@@ -1353,12 +1353,24 @@ class ANWBScraper:
                 if len(clean_word) >= 3 and clean_word in dutch_cities:
                     cities_found.append(clean_word.capitalize())
             
-            # Method 2: Look for specific patterns
+            # Method 2: Enhanced direction patterns with better location precision
             direction_patterns = [
-                r'van\s+([A-Za-z]+)\s+naar\s+([A-Za-z]+)',  # "van X naar Y"
-                r'richting\s+([A-Za-z]+)',  # "richting X"
-                r'naar\s+([A-Za-z]+)',  # "naar X"
-                r'([A-Za-z]+)\s*[-→]\s*([A-Za-z]+)',  # "X - Y" or "X → Y"
+                # Enhanced patterns for more precise location extraction
+                r'van\s+([A-Za-z\s]+)\s+naar\s+([A-Za-z\s]+)',  # "van X naar Y" (multi-word support)
+                r'richting\s+([A-Za-z\s]+)',  # "richting X" (multi-word support)
+                r'naar\s+([A-Za-z\s]+)',  # "naar X" (multi-word support)
+                r'([A-Za-z\s]+)\s*[-→]\s*([A-Za-z\s]+)',  # "X - Y" or "X → Y" (multi-word support)
+                r'knp\.\s*([A-Za-z\s]+)\s*(?:ri\.|richting)\s*([A-Za-z\s]+)',  # "knp. X ri. Y"
+                r'knooppunt\s+([A-Za-z\s]+)\s*(?:ri\.|richting)\s*([A-Za-z\s]+)',  # "knooppunt X richting Y"
+                r'aansluiting\s+([A-Za-z\s]+)',  # "aansluiting X"
+                r'afritte\s+([A-Za-z\s]+)',  # "afritte X"
+                r'hectometer\s+(\d+(?:\.\d+)?)',  # "hectometer XX.X"
+                r'hm\s+(\d+(?:\.\d+)?)',  # "hm XX.X"
+                r'bij\s+km\s+(\d+(?:\.\d+)?)',  # "bij km XX.X"
+                r'ter\s+hoogte\s+van\s+([A-Za-z\s]+)',  # "ter hoogte van X"
+                r'nabij\s+([A-Za-z\s]+)',  # "nabij X"
+                r'voorbij\s+([A-Za-z\s]+)',  # "voorbij X"
+                r'voor\s+([A-Za-z\s]+)',  # "voor X"
             ]
             
             for pattern in direction_patterns:
