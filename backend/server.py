@@ -355,7 +355,7 @@ class ANWBScraper:
                     except Exception as e2:
                         print(f"Webdriver-manager failed: {e2}")
                         # Last resort - try default service
-                        service = ChromeService()
+                        service = Service()
                         print("Using default chromedriver service")
                 
                 service.creation_flags = 0x08000000  # CREATE_NO_WINDOW for Windows compatibility
