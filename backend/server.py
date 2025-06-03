@@ -677,34 +677,141 @@ class ANWBScraper:
             return "Hectometer onbekend"
 
     def _extract_flitser_location(self, text: str, hectometer: str) -> str:
-        """Extract location information combining hectometer and other details"""
+        """Enhanced location information extraction with junction names and geographic precision"""
         try:
-            # Start with hectometer if available
             location_parts = []
             
-            if hectometer and hectometer != "Hectometer onbekend":
-                location_parts.append(hectometer)
-            
-            # Look for additional location indicators
-            location_indicators = [
-                r'bij\s+([^→\n,\.]+)',
-                r'ter hoogte van\s+([^→\n,\.]+)', 
-                r'nabij\s+([^→\n,\.]+)',
-                r'tussen\s+([^→\n,\.]+)',
-                r'afrit\s+([^→\n,\.]+)'
+            # Enhanced junction/exit patterns with more comprehensive Dutch road infrastructure terms
+            junction_patterns = [
+                # Standard exits and interchanges
+                r'afrit\s+(\d+[A-Za-z]?)\s*[-:]?\s*([^,\n\.;]+)',
+                r'knooppunt\s+([^,\n\.;]+)',
+                r'aansluiting\s+([^,\n\.;]+)', 
+                r'kruising\s+([^,\n\.;]+)',
+                r'rotonde\s+([^,\n\.;]+)',
+                
+                # Near/at location indicators
+                r'bij\s+([^,\n\.;]{3,30})',
+                r'ter hoogte van\s+([^,\n\.;]{3,30})',
+                r'nabij\s+([^,\n\.;]{3,30})',
+                r'voorbij\s+([^,\n\.;]{3,30})',
+                r'voor\s+([^,\n\.;]{3,30})',
+                r'richting\s+([^,\n\.;]{3,30})',
+                
+                # Place name patterns
+                r'in\s+([A-Z][a-z]{2,20})',
+                r'te\s+([A-Z][a-z]{2,20})',
+                r'naar\s+([A-Z][a-z]{2,20})',
+                
+                # Specific road infrastructure
+                r'brug\s+([^,\n\.;]+)',
+                r'tunnel\s+([^,\n\.;]+)',
+                r'viaduct\s+([^,\n\.;]+)',
+                r'parallelweg\s+([^,\n\.;]+)',
+                r'oprit\s+([^,\n\.;]+)',
+                r'afrit\s+([^,\n\.;]+)',
+                
+                # Commercial/landmark references  
+                r'tankstation\s+([^,\n\.;]+)',
+                r'servicegebied\s+([^,\n\.;]+)',
+                r'industrieterrein\s+([^,\n\.;]+)',
+                r'bedrijventerrein\s+([^,\n\.;]+)',
             ]
             
-            for pattern in location_indicators:
-                match = re.search(pattern, text, re.IGNORECASE)
-                if match:
-                    location_detail = match.group(1).strip()
-                    if location_detail not in [part for part in location_parts]:
-                        location_parts.append(location_detail)
-                    break
+            # Search for junction/location information
+            location_found = False
+            for pattern in junction_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    if pattern.startswith(r'afrit\s+(\d+'):
+                        # Special handling for numbered exits
+                        exit_num = match.group(1)
+                        exit_name = match.group(2).strip() if len(match.groups()) > 1 else ""
+                        if exit_name:
+                            location_parts.append(f"afrit {exit_num} ({exit_name})")
+                        else:
+                            location_parts.append(f"afrit {exit_num}")
+                        location_found = True
+                    else:
+                        # General location extraction
+                        location_text = match.group(1).strip()
+                        # Clean up common artifacts
+                        location_text = re.sub(r'^\s*[-:]\s*', '', location_text)
+                        location_text = re.sub(r'\s+', ' ', location_text)
+                        
+                        # Filter out very short or invalid entries
+                        if len(location_text) >= 3 and not re.match(r'^\d+$', location_text):
+                            # Determine the type of location reference
+                            pattern_type = pattern.split('\\s+')[0].replace('r\'', '')
+                            if pattern_type in ['bij', 'ter', 'nabij', 'voorbij', 'voor']:
+                                location_parts.append(f"{pattern_type} {location_text}")
+                            elif pattern_type in ['knooppunt', 'aansluiting', 'kruising', 'rotonde']:
+                                location_parts.append(f"{pattern_type} {location_text}")
+                            else:
+                                location_parts.append(location_text)
+                            location_found = True
             
-            # Combine location parts
+            # Enhanced city/place detection with context
+            if not location_found:
+                # Look for Dutch city names (starting with capital letter)
+                city_pattern = r'\b([A-Z][a-z]{2,20}(?:\s+[A-Z][a-z]{2,20})?)\b'
+                city_matches = re.findall(city_pattern, text)
+                
+                # Common Dutch cities and towns in the monitoring area
+                known_cities = {
+                    'Eindhoven', 'Venlo', 'Weert', 'Helmond', 'Tilburg', 'Breda', 'Bergen', 'Roermond',
+                    'Maastricht', 'Sittard', 'Heerlen', 'Geleen', 'Venray', 'Deurne', 'Uden', 'Veghel',
+                    'Oss', 'Boxtel', 'Vught', 'Oisterwijk', 'Waalwijk', 'Oosterhout', 'Etten-Leur',
+                    'Roosendaal', 'Bergen op Zoom', 'Terneuzen', 'Goes', 'Middelburg'
+                }
+                
+                for city in city_matches:
+                    if city in known_cities or len(city) >= 4:
+                        location_parts.append(f"bij {city}")
+                        break
+            
+            # Enhanced direction/road context extraction
+            direction_context = []
+            direction_patterns = [
+                r'richting\s+([^,\n\.;]{3,25})',
+                r'naar\s+([A-Z][a-z]{2,20})',
+                r'vanuit\s+([A-Z][a-z]{2,20})',
+                r'([ns]oord|[ow]est)(?:elijk)?(?:\s+richting)?',
+                r'([A-Z]\d+)\s*(?:richting|naar)',
+            ]
+            
+            for pattern in direction_patterns:
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    direction_text = match.group(1).strip() if match.group(1) else match.group(0)
+                    if len(direction_text) >= 2:
+                        direction_context.append(direction_text)
+            
+            # Combine all location information
+            result_parts = []
+            
+            # Add main location information
             if location_parts:
-                return " - ".join(location_parts)
+                # Remove duplicates while preserving order
+                seen = set()
+                unique_locations = []
+                for loc in location_parts:
+                    if loc.lower() not in seen:
+                        unique_locations.append(loc)
+                        seen.add(loc.lower())
+                result_parts.extend(unique_locations[:2])  # Limit to 2 most relevant
+            
+            # Add hectometer if available and meaningful
+            if hectometer and hectometer != "Hectometer onbekend":
+                result_parts.append(hectometer)
+            
+            # Add direction context if available
+            if direction_context and len(result_parts) < 3:
+                result_parts.append(f"richting {direction_context[0]}")
+            
+            # Format final result
+            if result_parts:
+                return ", ".join(result_parts)
             else:
                 return "Locatie onbekend"
                 
