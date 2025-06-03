@@ -522,8 +522,8 @@ class ANWBScraper:
                 
                 try:
                     print("📡 Navigating to ANWB traffic page...")
-                    await page.goto("https://www.anwb.nl/verkeer", timeout=30000)
-                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    await page.goto("https://www.anwb.nl/verkeer", timeout=60000)  # Increased timeout
+                    await page.wait_for_load_state("networkidle", timeout=60000)  # Increased timeout
                     
                     print("🔍 Analyzing main traffic page for A58...")
                     
@@ -533,8 +533,8 @@ class ANWBScraper:
                     
                     # Now check the filelijst page specifically
                     print("\n📡 Navigating to ANWB filelijst page (where A58 traffic was reported)...")
-                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=30000)
-                    await page.wait_for_load_state("networkidle", timeout=30000)
+                    await page.goto("https://www.anwb.nl/verkeer/filelijst", timeout=60000)  # Increased timeout
+                    await page.wait_for_load_state("domcontentloaded", timeout=60000)  # Changed to domcontentloaded
                     
                     print("🔍 Analyzing filelijst page for A58 traffic...")
                     content = await page.content()
