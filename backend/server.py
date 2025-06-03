@@ -944,33 +944,48 @@ class ANWBScraper:
                                         print(f"✅ DETECTED {mentioned_road} TRAFFIC JAM: {delay_minutes}min, {length_km}km!")
                                         
                                     else:
-                                        # Check for traffic indicators for jams without clear patterns
-                                        traffic_indicators = ['vertraging', 'file', 'oponthoud', 'langzaam', 'stilstaand']
-                                        if any(indicator in element_text.lower() for indicator in traffic_indicators):
-                                            print(f"📝 {mentioned_road} traffic indicator (no clear pattern): {element_text_clean[:100]}...")
-                                            
-                                            # Try to extract delay with enhanced patterns
-                                            delay_minutes = self._extract_delay_minutes(element_text)
-                                            if delay_minutes > 0:
-                                                length_km = self._extract_length_km(element_text)
+                                        # No direct delay pattern found - check if this is a container that needs expansion
+                                        print(f"🔍 No direct delay pattern in {mentioned_road}, checking for expandable container...")
+                                        
+                                        # Try to expand container and get individual jams
+                                        expanded_jams = await self._expand_and_extract_individual_jams(page, element, mentioned_road)
+                                        
+                                        if expanded_jams:
+                                            print(f"🎉 Successfully extracted {len(expanded_jams)} individual jams from expanded container")
+                                            all_traffic_jams.extend(expanded_jams)
+                                        else:
+                                            # Fallback: check for traffic indicators without clear patterns
+                                            traffic_indicators = ['vertraging', 'file', 'oponthoud', 'langzaam', 'stilstaand']
+                                            if any(indicator in element_text.lower() for indicator in traffic_indicators):
+                                                print(f"📝 {mentioned_road} traffic indicator (no clear pattern): {element_text_clean[:100]}...")
                                                 
-                                                traffic_jam = {
-                                                    'id': f"{mentioned_road}_indicator_{int(time.time())}_{len(all_traffic_jams)}",
-                                                    'road': mentioned_road,
-                                                    'direction': self._extract_traffic_direction(element_text),
-                                                    'source_location': source_city,
-                                                    'destination_location': dest_city,
-                                                    'route_details': element_text_clean,
-                                                    'cause': self._extract_traffic_cause(element_text),
-                                                    'delay_minutes': delay_minutes,
-                                                    'length_km': length_km,
-                                                    'raw_text': element_text_clean,
-                                                    'enhanced_direction': self._extract_traffic_direction(element_text),
-                                                    'enhanced_cause': self._extract_traffic_cause(element_text),
-                                                    'last_updated': datetime.now()
-                                                }
-                                                all_traffic_jams.append(traffic_jam)
-                                                print(f"✅ DETECTED {mentioned_road} TRAFFIC (indicator): {delay_minutes}min!")
+                                                # Try to extract delay with enhanced patterns
+                                                delay_minutes = self._extract_delay_minutes(element_text)
+                                                if delay_minutes > 0:
+                                                    length_km = self._extract_length_km(element_text)
+                                                    
+                                                    traffic_jam = {
+                                                        'id': f"{mentioned_road}_indicator_{int(time.time())}_{len(all_traffic_jams)}",
+                                                        'road': mentioned_road,
+                                                        'direction': self._extract_traffic_direction(element_text),
+                                                        'source_location': source_city,
+                                                        'destination_location': dest_city,
+                                                        'route_details': detailed_info['clean_delay_text'],
+                                                        'cause': self._extract_traffic_cause(element_text),
+                                                        'delay_minutes': delay_minutes,
+                                                        'length_km': length_km,
+                                                        'raw_text': element_text_clean,
+                                                        'enhanced_direction': self._extract_traffic_direction(element_text),
+                                                        'enhanced_cause': self._extract_traffic_cause(element_text),
+                                                        # Enhanced formatting information
+                                                        'direction_line': detailed_info['direction_line'],
+                                                        'city_line': detailed_info['city_line'],
+                                                        'route_info': detailed_info['route_info'],
+                                                        'formatted_delay': f"+ {delay_minutes} min",
+                                                        'last_updated': datetime.now()
+                                                    }
+                                                    all_traffic_jams.append(traffic_jam)
+                                                    print(f"✅ DETECTED {mentioned_road} TRAFFIC (indicator): {delay_minutes}min!")
                             except Exception as e:
                                 continue
                                 
