@@ -378,91 +378,222 @@ class ANWBScraper:
         
         raise Exception("Unexpected error in driver creation")
 
-    def _extract_traffic_jams_fast(self, driver) -> List[Dict]:
-        """Fast traffic jam extraction with minimal accordion interaction"""
+    def _debug_page_structure(self, driver, page_type="traffic") -> None:
+        """Debug function to analyze current page structure"""
+        try:
+            print(f"\n🔍 DEBUG: Analyzing {page_type} page structure...")
+            
+            # Get page title and URL
+            print(f"Page URL: {driver.current_url}")
+            print(f"Page Title: {driver.title}")
+            
+            # Look for common traffic-related terms in the page
+            page_source = driver.page_source.lower()
+            traffic_terms = ['verkeer', 'file', 'vertraging', 'flitser', 'camera', 'snelheidscontrole']
+            
+            for term in traffic_terms:
+                count = page_source.count(term)
+                if count > 0:
+                    print(f"Found '{term}': {count} times")
+            
+            # Check for potential data containers
+            potential_containers = [
+                "article", "section", "div[class*='traffic']", "div[class*='jam']", 
+                "div[class*='flitser']", "ul", "li", "[data-testid]", "[data-*]"
+            ]
+            
+            for selector in potential_containers:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        print(f"Found {len(elements)} elements with selector '{selector}'")
+                        # Show first element's text if available
+                        if elements[0].text.strip():
+                            sample_text = elements[0].text.strip()[:100]
+                            print(f"  Sample text: {sample_text}...")
+                except:
+                    continue
+            
+            # Look for road numbers in the page
+            import re
+            road_pattern = r'\b(A\d+|N\d+)\b'
+            roads_found = set(re.findall(road_pattern, driver.page_source))
+            if roads_found:
+                print(f"Roads found in page: {list(roads_found)}")
+            
+        except Exception as e:
+            print(f"Debug analysis failed: {e}")
+
+    def _adaptive_traffic_extraction(self, driver) -> List[Dict]:
+        """Adaptive traffic jam extraction that works with current website structure"""
         traffic_jams = []
         
         try:
-            print("Starting fast traffic jam extraction...")
+            print("Starting adaptive traffic jam extraction...")
             
-            # Find all road articles quickly
-            road_articles = driver.find_elements(By.CSS_SELECTOR, "article[data-accordion-road]")
-            print(f"Found {len(road_articles)} road articles")
+            # Debug current page structure
+            self._debug_page_structure(driver, "traffic")
             
-            for article in road_articles:
+            # Strategy 1: Look for any elements containing traffic information
+            traffic_selectors = [
+                # Modern React/Vue component selectors
+                "[data-testid*='traffic']", "[data-testid*='jam']", "[data-testid*='road']",
+                "[class*='traffic']", "[class*='jam']", "[class*='road']", "[class*='verkeer']",
+                
+                # Generic content containers
+                "article", "section", ".content", ".main", "#content", "#main",
+                
+                # List-based layouts
+                "ul[class*='traffic']", "ul[class*='road']", "li[class*='traffic']", "li[class*='road']",
+                
+                # Card/item layouts
+                ".card", ".item", ".list-item", ".traffic-item", ".road-item"
+            ]
+            
+            all_potential_elements = []
+            for selector in traffic_selectors:
                 try:
-                    # Get road number
-                    road = article.get_attribute('data-accordion-road')
-                    if not road or road not in MONITORED_ROADS:
-                        continue
-                    
-                    print(f"Processing road: {road}")
-                    
-                    # Check if there are traffic jams (look for summary info)
-                    try:
-                        # Look for delay and length info in the collapsed view
-                        summary_info = article.find_element(By.CSS_SELECTOR, "[class*='sc-fd0a2c7e-6'], [class*='sc-fd0a2c7e-4']")
-                        summary_text = summary_info.text.strip()
-                        
-                        if summary_text and ('+' in summary_text or 'min' in summary_text):
-                            print(f"Found traffic summary for {road}: {summary_text}")
-                            
-                            # Extract delay and length from summary
-                            delay_minutes = self._extract_delay_minutes(summary_text)
-                            length_km = self._extract_length_km(summary_text)
-                            
-                            if delay_minutes > 0:
-                                # Try to click and get more details (but timeout quickly)
-                                direction = "Onbekende richting"
-                                route_details = "Route onbekend"
-                                cause = "Oorzaak onbekend"
-                                
-                                try:
-                                    # Quick click to expand
-                                    button = article.find_element(By.CSS_SELECTOR, "button")
-                                    driver.execute_script("arguments[0].click();", button)
-                                    time.sleep(1)  # Short wait
-                                    
-                                    # Get expanded content quickly
-                                    expanded_text = article.text
-                                    direction, source_location, destination_location = self._extract_detailed_direction_and_locations(expanded_text, [])
-                                    route_details = self._extract_route_details(expanded_text, [])
-                                    cause = self._extract_detailed_cause(expanded_text, [])
-                                    
-                                except Exception as e:
-                                    print(f"Could not expand {road} accordion: {e}")
-                                    # Use fallback values
-                                    source_location = "Onbekend"
-                                    destination_location = "Onbekend"
-                                
-                                traffic_jam = {
-                                    'id': f"{road}_{int(time.time())}_{len(traffic_jams)}",
-                                    'road': road,
-                                    'direction': direction,
-                                    'source_location': source_location,
-                                    'destination_location': destination_location,
-                                    'route_details': route_details,
-                                    'cause': cause,
-                                    'delay_minutes': delay_minutes,
-                                    'length_km': length_km,
-                                    'last_updated': datetime.now()
-                                }
-                                traffic_jams.append(traffic_jam)
-                                print(f"Added traffic jam: {road} - {delay_minutes}min, {length_km}km")
-                    
-                    except Exception as e:
-                        print(f"No traffic summary found for {road}")
-                        continue
-                        
-                except Exception as e:
-                    print(f"Error processing road {road}: {e}")
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        print(f"Found {len(elements)} elements with selector: {selector}")
+                        all_potential_elements.extend(elements)
+                except:
                     continue
             
+            # Strategy 2: Text-based search for traffic information
+            print("Performing text-based traffic search...")
+            
+            try:
+                # Search for elements containing specific traffic-related text
+                traffic_xpath_patterns = [
+                    "//*[contains(text(), 'vertraging')]",
+                    "//*[contains(text(), 'file')]", 
+                    "//*[contains(text(), 'minuten')]",
+                    "//*[contains(text(), 'min')]",
+                    "//*[contains(text(), 'km')]",
+                    "//*[contains(text(), 'richting')]",
+                ]
+                
+                for pattern in traffic_xpath_patterns:
+                    try:
+                        elements = driver.find_elements(By.XPATH, pattern)
+                        all_potential_elements.extend(elements)
+                        if elements:
+                            print(f"Found {len(elements)} elements with pattern: {pattern}")
+                    except:
+                        continue
+                        
+            except Exception as e:
+                print(f"Text-based search failed: {e}")
+            
+            # Strategy 3: Search for road numbers and surrounding content
+            print("Searching for road-specific content...")
+            
+            for road in MONITORED_ROADS:
+                try:
+                    # Look for road numbers in text
+                    road_xpath = f"//*[contains(text(), '{road}')]"
+                    road_elements = driver.find_elements(By.XPATH, road_xpath)
+                    
+                    for element in road_elements:
+                        parent = element.find_element(By.XPATH, "./..")
+                        all_potential_elements.append(parent)
+                        
+                    if road_elements:
+                        print(f"Found {len(road_elements)} elements mentioning {road}")
+                        
+                except:
+                    continue
+            
+            # Process all potential elements
+            print(f"Processing {len(all_potential_elements)} potential traffic elements...")
+            
+            processed_texts = set()
+            for element in all_potential_elements:
+                try:
+                    element_text = element.text.strip()
+                    
+                    # Skip empty or very short text
+                    if not element_text or len(element_text) < 10:
+                        continue
+                    
+                    # Skip if already processed (avoid duplicates)
+                    text_hash = hash(element_text[:50])
+                    if text_hash in processed_texts:
+                        continue
+                    processed_texts.add(text_hash)
+                    
+                    # Check if this looks like traffic information
+                    text_lower = element_text.lower()
+                    
+                    # Traffic indicators
+                    has_delay = any(term in text_lower for term in ['min', 'minuten', 'vertraging'])
+                    has_road = any(road.lower() in text_lower for road in MONITORED_ROADS)
+                    has_traffic_terms = any(term in text_lower for term in ['file', 'verkeer', 'richting', 'km'])
+                    
+                    if (has_delay and has_road) or (has_road and has_traffic_terms):
+                        print(f"Potential traffic jam found: {element_text[:100]}...")
+                        
+                        # Extract information from this element
+                        traffic_jam = self._parse_traffic_element(element_text, element)
+                        if traffic_jam:
+                            traffic_jams.append(traffic_jam)
+                
+                except Exception as e:
+                    continue
+            
+            print(f"Adaptive traffic extraction complete: {len(traffic_jams)} jams found")
+            return traffic_jams
+            
         except Exception as e:
-            print(f"Error in fast traffic extraction: {e}")
-        
-        print(f"Fast traffic extraction complete: {len(traffic_jams)} jams found")
-        return traffic_jams
+            print(f"Error in adaptive traffic extraction: {e}")
+            return []
+
+    def _parse_traffic_element(self, text: str, element) -> Dict:
+        """Parse individual traffic element with enhanced extraction"""
+        try:
+            # Enhanced direction extraction
+            direction = self._extract_traffic_direction(text)
+            
+            # Enhanced cause extraction  
+            cause = self._extract_traffic_cause(text)
+            
+            # Extract road information
+            road = "Onbekend"
+            for monitored_road in MONITORED_ROADS:
+                if monitored_road.upper() in text.upper():
+                    road = monitored_road
+                    break
+            
+            # Extract delay information
+            delay_minutes = self._extract_delay_minutes(text)
+            
+            # Extract length information  
+            length_km = self._extract_length_km(text)
+            
+            # Only create traffic jam if we have meaningful delay
+            if delay_minutes > 0:
+                return {
+                    'id': f"{road}_{int(time.time())}_{hash(text[:50])}",
+                    'road': road,
+                    'direction': direction,
+                    'source_location': "Locatie extractie in ontwikkeling",
+                    'destination_location': "Locatie extractie in ontwikkeling", 
+                    'route_details': text[:200],  # Keep original text for debugging
+                    'cause': cause,
+                    'delay_minutes': delay_minutes,
+                    'length_km': length_km,
+                    'raw_text': text,  # Keep full text for enhanced processing
+                    'enhanced_direction': direction,  # Use enhanced method
+                    'enhanced_cause': cause,  # Use enhanced method
+                    'last_updated': datetime.now()
+                }
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error parsing traffic element: {e}")
+            return None
 
     def _extract_flitsers_fast(self, driver) -> List[Dict]:
         """Enhanced flitser extraction to find more flitsers with better detection"""
