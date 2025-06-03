@@ -286,15 +286,29 @@ function App() {
                           {jam.road}
                         </span>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${getDelayColor(jam.delay_minutes)}`}>
-                          +{jam.delay_minutes} min
+                          {jam.formatted_delay || `+${jam.delay_minutes} min`}
                         </span>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                           {jam.length_km} km
                         </span>
                       </div>
 
-                      {/* Direction and Locations */}
-                      {jam.direction && jam.direction !== 'Onbekende richting' && (
+                      {/* Enhanced Direction Line */}
+                      {jam.direction_line && jam.direction_line.trim() !== '' && (
+                        <p className="text-sm text-blue-600 font-medium mb-1">
+                          📍 {jam.direction_line}
+                        </p>
+                      )}
+
+                      {/* Enhanced City Line */}
+                      {jam.city_line && jam.city_line.trim() !== '' && (
+                        <p className="text-sm text-green-600 font-medium mb-1">
+                          🏙️ {jam.city_line}
+                        </p>
+                      )}
+
+                      {/* Fallback Direction (if no direction_line) */}
+                      {(!jam.direction_line || jam.direction_line.trim() === '') && jam.direction && jam.direction !== 'Onbekende richting' && (
                         <p className="text-sm text-blue-600 font-medium mb-1">
                           📍 {jam.direction}
                         </p>
@@ -307,8 +321,8 @@ function App() {
                         </p>
                       )}
 
-                      {/* Source and Destination */}
-                      {(jam.source_location && jam.destination_location && 
+                      {/* Source and Destination (fallback if no city_line) */}
+                      {(!jam.city_line || jam.city_line.trim() === '') && (jam.source_location && jam.destination_location && 
                         jam.source_location !== 'Onbekend' && jam.destination_location !== 'Onbekend') && (
                         <p className="text-sm text-gray-600 mb-1">
                           📍 Van {jam.source_location} naar {jam.destination_location}
