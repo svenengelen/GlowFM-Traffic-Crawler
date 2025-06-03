@@ -3941,6 +3941,56 @@ scheduler_thread.start()
 scrape_and_store_data()
 
 # API Endpoints
+@app.get("/api/traffic/enhanced", response_model=TrafficData)
+async def get_enhanced_traffic_data():
+    """Get traffic data using enhanced parallel container expansion"""
+    try:
+        print("🚀 Starting enhanced parallel traffic data collection...")
+        
+        # Create scraper instance
+        scraper = ANWBScraper()
+        
+        # Use enhanced parallel container expansion
+        traffic_jams = await scraper._enhanced_parallel_container_expansion()
+        
+        # Get speed cameras (existing method)
+        speed_cameras = await scraper._scrape_speed_cameras()
+        
+        # Calculate statistics
+        total_jams = len(traffic_jams)
+        total_mobile_flitsers = len([cam for cam in speed_cameras if cam.get('mobile', False)])
+        avg_delay = sum(jam['delay_minutes'] for jam in traffic_jams) / total_jams if total_jams > 0 else 0
+        
+        # Create response data
+        enhanced_data = TrafficData(
+            traffic_jams=traffic_jams,
+            speed_cameras=speed_cameras,
+            total_jams=total_jams,
+            total_mobile_flitsers=total_mobile_flitsers,
+            average_delay=round(avg_delay, 1),
+            timestamp=int(time.time())
+        )
+        
+        # Store enhanced data in MongoDB
+        await db.traffic_data.replace_one(
+            {'type': 'enhanced_latest'},
+            {
+                'type': 'enhanced_latest',
+                'data': enhanced_data.dict(),
+                'timestamp': int(time.time())
+            },
+            upsert=True
+        )
+        
+        print(f"✅ Enhanced parallel extraction complete: {total_jams} traffic jams, {total_mobile_flitsers} mobile flitsers")
+        return enhanced_data
+        
+    except Exception as e:
+        print(f"❌ Enhanced traffic data collection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Enhanced traffic data collection failed: {str(e)}")
+
 @app.get("/api/traffic", response_model=TrafficData)
 async def get_traffic_data(
     road: Optional[str] = None,
