@@ -27,6 +27,27 @@ class ANWBTrafficTester:
         self.expected_flitser_types = [
             'Mobiele flitser', 'Actieve flitser', 'Snelheidscontrole'
         ]
+        
+        # Enhanced location patterns to check
+        self.hectometer_patterns = [
+            r'hm \d+\.\d+',  # e.g., "hm 12.3"
+            r'hectometerpaal \d+\.\d+',  # e.g., "hectometerpaal 45.7"
+            r'\d+\.\d+ km',  # e.g., "45.7 km"
+        ]
+        
+        # Junction/exit terms to check
+        self.junction_terms = [
+            'knooppunt', 'afslag', 'afrit', 'oprit', 'aansluiting', 
+            'kruising', 'rotonde', 'verkeerslicht', 'brug', 'tunnel'
+        ]
+        
+        # Traffic cause terms to check
+        self.traffic_cause_terms = {
+            'accidents': ['ongeval', 'aanrijding', 'botsing', 'brand', 'hulpdiensten'],
+            'roadworks': ['wegwerkzaamheden', 'afsluiting', 'versmalling', 'werkzaamheden'],
+            'weather': ['gladheid', 'sneeuw', 'mist', 'regen', 'storm', 'weer'],
+            'volume': ['drukte', 'spitsuur', 'file', 'verkeersdrukte']
+        }
 
     def run_test(self, name, method, endpoint, expected_status, params=None, data=None):
         """Run a single API test"""
