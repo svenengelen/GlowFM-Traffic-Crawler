@@ -1665,6 +1665,79 @@ class ANWBScraper:
         
         return None
 
+    def _extract_traffic_direction(self, raw_text: str) -> str:
+        """Enhanced traffic direction extraction with better precision"""
+        try:
+            text = raw_text.lower()
+            
+            # Enhanced direction patterns with more comprehensive detection
+            direction_patterns = [
+                # Direct direction indicators
+                (r'richting\s+([^,\n\.;]{3,25})', 'richting {}'),
+                (r'naar\s+([A-Z][a-z]{2,20})', 'naar {}'),
+                (r'vanuit\s+([A-Z][a-z]{2,20})', 'vanuit {}'),
+                
+                # Cardinal directions with context
+                (r'\b(noord(?:elijk)?|noorden)\b', 'noordelijk'),
+                (r'\b(zuid(?:elijk)?|zuiden)\b', 'zuidelijk'),
+                (r'\b(oost(?:elijk)?|oosten)\b', 'oostelijk'),
+                (r'\b(west(?:elijk)?|westen)\b', 'westelijk'),
+                
+                # Highway-specific directions
+                (r'([A-Z]\d+)\s*richting\s*([^,\n\.;]+)', '{} richting {}'),
+                (r'([A-Z]\d+)\s*naar\s*([A-Z][a-z]{2,20})', '{} naar {}'),
+                
+                # More specific location-based directions
+                (r'([A-Z]\d+).*?(?:richting|naar)\s*([A-Z][a-z]{3,20})', '{} richting {}'),
+                (r'tussen\s+([^,\n\.;]+)\s+en\s+([^,\n\.;]+)', 'tussen {} en {}'),
+                
+                # Exit/junction based directions
+                (r'afrit\s+(\d+[A-Za-z]?)\s*[-:]?\s*([^,\n\.;]+)', 'afrit {} ({})'),
+                (r'knooppunt\s+([^,\n\.;]+)', 'knooppunt {}'),
+                
+                # Fallback patterns for common terms
+                (r'\b(linkerrijstrook|rechterrijstrook|middenstrook|vluchtstrook)\b', '{}'),
+                (r'\b(beide\s+richtingen|alle\s+rijstroken)\b', '{}'),
+            ]
+            
+            # Try each pattern in order of preference
+            for pattern, format_str in direction_patterns:
+                match = re.search(pattern, raw_text, re.IGNORECASE)
+                if match:
+                    groups = match.groups()
+                    if len(groups) == 1:
+                        direction = groups[0].strip()
+                        if len(direction) >= 2:
+                            return format_str.format(direction)
+                    elif len(groups) == 2:
+                        dir1, dir2 = groups[0].strip(), groups[1].strip()
+                        if len(dir1) >= 1 and len(dir2) >= 2:
+                            return format_str.format(dir1, dir2)
+            
+            # Enhanced fallback: look for city names as direction indicators
+            known_cities = {
+                'eindhoven', 'venlo', 'weert', 'helmond', 'tilburg', 'breda', 'bergen', 'roermond',
+                'maastricht', 'sittard', 'heerlen', 'amsterdam', 'rotterdam', 'utrecht', 'den haag',
+                'apeldoorn', 'arnhem', 'nijmegen', 'enschede', 'groningen', 'leeuwarden', 'zwolle'
+            }
+            
+            # Look for city names that might indicate direction
+            words = text.split()
+            for i, word in enumerate(words):
+                clean_word = re.sub(r'[^\w]', '', word.lower())
+                if clean_word in known_cities:
+                    # Check if there's a direction indicator before the city
+                    if i > 0 and words[i-1].lower() in ['richting', 'naar', 'vanaf']:
+                        return f"{words[i-1]} {clean_word.capitalize()}"
+                    else:
+                        return f"richting {clean_word.capitalize()}"
+            
+            return "Richting onbekend"
+            
+        except Exception as e:
+            print(f"Error extracting traffic direction: {e}")
+            return "Richting onbekend"
+
     def _extract_flitser_type_and_status(self, text: str) -> tuple:
         """Extract flitser type and activity status"""
         flitser_type = "Mobiele flitser"  # Default for dynamic flitsers
