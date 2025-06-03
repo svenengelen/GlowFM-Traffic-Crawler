@@ -402,7 +402,113 @@ class ANWBScraper:
                     print("All driver creation attempts failed")
                     raise Exception(f"Failed to create Chrome driver after {max_retries} attempts: {e}")
         
-        raise Exception("Unexpected error in driver creation")
+    def _playwright_scrape_traffic(self) -> List[Dict]:
+        """Playwright-based traffic scraping for immediate A58 testing"""
+        traffic_jams = []
+        
+        try:
+            print("🚀 Starting Playwright traffic scraping for A58 debugging...")
+            
+            with sync_playwright() as p:
+                # Launch browser
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                try:
+                    print("📡 Navigating to ANWB traffic page...")
+                    page.goto("https://www.anwb.nl/verkeer", timeout=30000)
+                    page.wait_for_load_state("networkidle", timeout=30000)
+                    
+                    print("🔍 Analyzing page content for A58 traffic...")
+                    
+                    # Get all text content
+                    content = page.content()
+                    print(f"📄 Page loaded, content length: {len(content)} characters")
+                    
+                    # Look for A58 specifically
+                    if "A58" in content:
+                        print("✅ A58 found on page!")
+                        
+                        # Get all text
+                        all_text = page.inner_text("body")
+                        
+                        # Split into lines and look for A58-related content
+                        lines = all_text.split('\n')
+                        a58_lines = [line.strip() for line in lines if 'A58' in line and line.strip()]
+                        
+                        print(f"🎯 Found {len(a58_lines)} lines mentioning A58:")
+                        for i, line in enumerate(a58_lines[:10]):  # Show first 10
+                            print(f"  {i+1}: {line}")
+                        
+                        # Look for traffic jam indicators near A58
+                        traffic_keywords = ['vertraging', 'file', 'min', 'minuten', 'km', 'richting']
+                        
+                        for line in a58_lines:
+                            line_lower = line.lower()
+                            if any(keyword in line_lower for keyword in traffic_keywords):
+                                print(f"🚨 POTENTIAL A58 TRAFFIC JAM: {line}")
+                                
+                                # Parse this as a traffic jam
+                                delay_minutes = self._extract_delay_minutes(line)
+                                if delay_minutes > 0:
+                                    traffic_jam = {
+                                        'id': f"A58_playwright_{int(time.time())}",
+                                        'road': 'A58',
+                                        'direction': self._extract_traffic_direction(line),
+                                        'source_location': "Playwright extraction",
+                                        'destination_location': "Playwright extraction",
+                                        'route_details': line,
+                                        'cause': self._extract_traffic_cause(line),
+                                        'delay_minutes': delay_minutes,
+                                        'length_km': self._extract_length_km(line),
+                                        'raw_text': line,
+                                        'enhanced_direction': self._extract_traffic_direction(line),
+                                        'enhanced_cause': self._extract_traffic_cause(line),
+                                        'last_updated': datetime.now()
+                                    }
+                                    traffic_jams.append(traffic_jam)
+                                    print(f"📋 Created traffic jam entry: {delay_minutes}min delay")
+                    
+                    else:
+                        print("❌ A58 not found on page")
+                        
+                        # Let's see what roads ARE mentioned
+                        roads_found = []
+                        for road in MONITORED_ROADS:
+                            if road in content:
+                                roads_found.append(road)
+                        print(f"🛣️ Roads found on page: {roads_found}")
+                    
+                    # Look for any traffic jam patterns regardless of road
+                    print("\n🔍 Looking for any traffic jam patterns...")
+                    all_text = page.inner_text("body")
+                    
+                    # Look for delay patterns
+                    import re
+                    delay_patterns = [
+                        r'(\d+)\s*min(?:uten)?\s+vertraging',
+                        r'vertraging\s+(\d+)\s*min(?:uten)?',
+                        r'(\d+)\s*min(?:uten)?\s+file',
+                        r'file\s+(\d+)\s*min(?:uten)?'
+                    ]
+                    
+                    lines = all_text.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if len(line) > 10:  # Reasonable length
+                            for pattern in delay_patterns:
+                                if re.search(pattern, line, re.IGNORECASE):
+                                    print(f"🚨 TRAFFIC PATTERN FOUND: {line}")
+                                    break
+                    
+                finally:
+                    browser.close()
+                    
+        except Exception as e:
+            print(f"❌ Playwright scraping failed: {e}")
+            
+        print(f"✅ Playwright scraping complete: {len(traffic_jams)} traffic jams found")
+        return traffic_jams
 
     def _debug_page_structure(self, driver, page_type="traffic") -> None:
         """Debug function to analyze current page structure"""
