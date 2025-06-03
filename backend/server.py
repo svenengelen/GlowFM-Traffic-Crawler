@@ -92,6 +92,18 @@ MONITORED_CITIES = [
     'Helmond', 'Venray', 'Heerlen', 'Maastricht', 'Belgische Grens', 'Duitse Grens', 'Valkenswaard'
 ]
 
+class TrafficScraper:
+    def __init__(self):
+        """Initialize scraper with enhanced error handling and parallel processing capabilities"""
+        self.max_workers = 3  # Number of parallel scraping sessions
+        self.retry_attempts = 3
+        self.timeout_duration = 60
+        self.session_pool = []
+        
+        # Configure logging for better error tracking
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
+
 class ANWBScraper:
     def __init__(self):
         self.base_url = "https://anwb.nl/verkeer/filelijst"
