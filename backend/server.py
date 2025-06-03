@@ -3291,9 +3291,39 @@ async def refresh_traffic_data():
         flitsers = []
         try:
             print("Attempting flitser detection...")
-            flitsers = await scraper._extract_flitsers_enhanced_parallel(None)  # Will handle driver creation internally
+            # Create a temporary driver for flitser detection
+            temp_driver = scraper._create_optimized_driver()
+            flitsers = scraper._adaptive_flitser_extraction(temp_driver)
+            temp_driver.quit()
         except Exception as e:
             print(f"Flitser detection failed: {e}")
+        
+        # Store the traffic data in the correct format for the main endpoint
+        if all_traffic_jams:
+            print(f"Storing {len(all_traffic_jams)} traffic jams...")
+            # Store in both the new format AND the legacy format that the main endpoint expects
+            await scraper._store_traffic_data_batch(all_traffic_jams)
+            
+            # CRITICAL: Also store in the legacy format for the main endpoint
+            traffic_data = {
+                'traffic_jams': all_traffic_jams,
+                'speed_cameras': flitsers,
+                'last_updated': datetime.now().isoformat(),
+                'total_jams': len(all_traffic_jams),
+                'total_cameras': len(flitsers)
+            }
+            
+            # Store in the legacy collection that the main endpoint reads from
+            await scraper.db.traffic_data.replace_one(
+                {'type': 'latest'},
+                {
+                    'type': 'latest',
+                    'data': traffic_data,
+                    'timestamp': datetime.now()
+                },
+                upsert=True
+            )
+            print(f"✅ Stored traffic data in legacy format for main endpoint compatibility")
         
         # Store flitser data if any
         if flitsers:
