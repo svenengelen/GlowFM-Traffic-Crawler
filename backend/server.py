@@ -595,179 +595,163 @@ class ANWBScraper:
             print(f"Error parsing traffic element: {e}")
             return None
 
-    def _extract_flitsers_fast(self, driver) -> List[Dict]:
-        """Enhanced flitser extraction to find more flitsers with better detection"""
+    def _adaptive_flitser_extraction(self, driver) -> List[Dict]:
+        """Adaptive flitser extraction that works with current website structure"""
         speed_cameras = []
         
         try:
-            print("Starting enhanced flitser extraction...")
+            print("Starting adaptive flitser extraction...")
             
-            # First, try to enable flitsers with multiple approaches
+            # Debug current page structure
+            self._debug_page_structure(driver, "flitser")
+            
+            # Strategy 1: Look for flitser-specific elements
+            flitser_selectors = [
+                # Modern React/Vue component selectors
+                "[data-testid*='flitser']", "[data-testid*='camera']", "[data-testid*='speed']",
+                "[class*='flitser']", "[class*='camera']", "[class*='speed']", "[class*='controle']",
+                
+                # Generic content containers
+                "article", "section", ".content", ".main", "#content", "#main",
+                
+                # List-based layouts
+                "ul[class*='flitser']", "ul[class*='camera']", "li[class*='flitser']", "li[class*='camera']",
+                
+                # Card/item layouts
+                ".card", ".item", ".list-item", ".flitser-item", ".camera-item"
+            ]
+            
+            all_potential_elements = []
+            for selector in flitser_selectors:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        print(f"Found {len(elements)} elements with selector: {selector}")
+                        all_potential_elements.extend(elements)
+                except:
+                    continue
+            
+            # Strategy 2: Text-based search for flitser information
+            print("Performing text-based flitser search...")
+            
             try:
-                print("Attempting to enable flitser display...")
-                
-                # Approach 1: Look for checkboxes
-                checkboxes = driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox']")
-                for checkbox in checkboxes:
-                    try:
-                        parent_text = checkbox.find_element(By.XPATH, "./..").text.lower()
-                        if 'flits' in parent_text:
-                            if not checkbox.is_selected():
-                                driver.execute_script("arguments[0].click();", checkbox)
-                                print(f"Enabled flitser checkbox: {parent_text}")
-                                time.sleep(2)
-                            break
-                    except:
-                        continue
-                
-                # Approach 2: Look for toggle buttons or labels
-                toggles = driver.find_elements(By.XPATH, "//*[contains(text(), 'Flits') or contains(text(), 'flits')]")
-                for toggle in toggles[:5]:  # Try first 5
-                    try:
-                        driver.execute_script("arguments[0].click();", toggle)
-                        print(f"Clicked flitser toggle: {toggle.text[:30]}")
-                        time.sleep(2)
-                        break
-                    except:
-                        continue
-                        
-            except Exception as e:
-                print(f"Could not enable flitser toggle: {e}")
-            
-            # Wait longer for flitser data to load
-            time.sleep(3)
-            
-            # Enhanced container detection with multiple strategies
-            try:
-                print("Searching for flitser data with enhanced detection...")
-                
-                all_containers = []
-                
-                # Strategy 1: Direct text search with broader patterns
-                text_selectors = [
+                # Search for elements containing flitser-related text
+                flitser_xpath_patterns = [
                     "//*[contains(text(), 'flitser')]",
                     "//*[contains(text(), 'Flitser')]", 
                     "//*[contains(text(), 'camera')]",
                     "//*[contains(text(), 'Camera')]",
                     "//*[contains(text(), 'snelheid')]",
                     "//*[contains(text(), 'controle')]",
-                    "//*[contains(text(), 'km ')]",  # Hectometer references
-                    "//*[contains(text(), 'hmp')]",   # Hectometer pole
+                    "//*[contains(text(), 'mobiel')]",
+                    "//*[contains(text(), 'hectometer')]",
+                    "//*[contains(text(), 'hmp')]",
                 ]
                 
-                for selector in text_selectors:
+                for pattern in flitser_xpath_patterns:
                     try:
-                        elements = driver.find_elements(By.XPATH, selector)
+                        elements = driver.find_elements(By.XPATH, pattern)
+                        all_potential_elements.extend(elements)
                         if elements:
-                            print(f"Found {len(elements)} elements with selector: {selector}")
-                            all_containers.extend(elements)
-                    except Exception as e:
-                        print(f"Selector failed: {selector} - {e}")
-                        continue
-                
-                # Strategy 2: Look for list items that might contain flitsers
-                try:
-                    list_items = driver.find_elements(By.TAG_NAME, "li")
-                    for item in list_items:
-                        if 'flitser' in item.text.lower() or 'camera' in item.text.lower():
-                            all_containers.append(item)
-                            
-                    print(f"Found {len([li for li in list_items if 'flitser' in li.text.lower()])} list items with flitser content")
-                except Exception as e:
-                    print(f"List item search failed: {e}")
-                
-                # Strategy 3: Look for div containers with flitser data
-                try:
-                    div_containers = driver.find_elements(By.TAG_NAME, "div")
-                    flitser_divs = []
-                    for div in div_containers:
-                        div_text = div.text.strip()
-                        if (len(div_text) > 10 and len(div_text) < 200 and  # Reasonable length
-                            ('flitser' in div_text.lower() or 
-                             ('km ' in div_text and any(road in div_text.upper() for road in MONITORED_ROADS)))):
-                            flitser_divs.append(div)
-                    
-                    all_containers.extend(flitser_divs)
-                    print(f"Found {len(flitser_divs)} div containers with potential flitser data")
-                except Exception as e:
-                    print(f"Div container search failed: {e}")
-                
-                print(f"Total containers found: {len(all_containers)}")
-                
-                # Process containers with improved deduplication
-                processed_texts = set()
-                for idx, container in enumerate(all_containers[:50]):  # Process more containers
-                    try:
-                        container_text = container.text.strip()
-                        
-                        # Skip if empty, too short, or already processed
-                        if not container_text or len(container_text) < 8:
-                            continue
-                            
-                        # Create a more specific hash to avoid over-deduplication
-                        text_hash = hash(container_text[:100])  # Use first 100 chars for hash
-                        if text_hash in processed_texts:
-                            continue
-                        processed_texts.add(text_hash)
-                        
-                        print(f"Processing container {idx}:")
-                        print(f"  Text preview: '{container_text[:100]}...'")
-                        
-                        # Try multiple extraction approaches
-                        flitser_data = None
-                        
-                        # Approach 1: Direct flitser info extraction
-                        if 'flitser' in container_text.lower():
-                            flitser_data = self._extract_detailed_flitser_info(container_text, idx)
-                            
-                        # Approach 2: Road + km pattern (even without explicit "flitser")
-                        elif any(road in container_text.upper() for road in MONITORED_ROADS) and 'km ' in container_text:
-                            print(f"  Found road+km pattern, treating as potential flitser")
-                            flitser_data = self._extract_detailed_flitser_info(container_text, idx)
-                            
-                        # Approach 3: Look for parent/sibling context
-                        if not flitser_data:
-                            try:
-                                # Check parent element for more context
-                                parent = container.find_element(By.XPATH, "./..")
-                                parent_text = parent.text.strip()
-                                if (len(parent_text) > len(container_text) and 
-                                    ('flitser' in parent_text.lower() or 
-                                     any(road in parent_text.upper() for road in MONITORED_ROADS))):
-                                    print(f"  Trying parent context")
-                                    flitser_data = self._extract_detailed_flitser_info(parent_text, idx)
-                            except:
-                                pass
-                        
-                        if flitser_data:
-                            # Check for duplicates based on road and location
-                            is_duplicate = False
-                            for existing in speed_cameras:
-                                if (existing['road'] == flitser_data['road'] and 
-                                    existing['hectometer'] == flitser_data['hectometer']):
-                                    is_duplicate = True
-                                    break
-                            
-                            if not is_duplicate:
-                                speed_cameras.append(flitser_data)
-                                print(f"  ✅ Added flitser: {flitser_data['road']} - {flitser_data['hectometer']} - {flitser_data['direction']}")
-                            else:
-                                print(f"  ⚠️  Skipped duplicate flitser")
-                        else:
-                            print(f"  ❌ No flitser data extracted")
-                            
-                    except Exception as e:
-                        print(f"Error processing container {idx}: {e}")
+                            print(f"Found {len(elements)} elements with pattern: {pattern}")
+                    except:
                         continue
                         
             except Exception as e:
-                print(f"Error in enhanced flitser detection: {e}")
+                print(f"Text-based flitser search failed: {e}")
+            
+            # Strategy 3: Search for road numbers with flitser context
+            print("Searching for road-specific flitser content...")
+            
+            for road in MONITORED_ROADS:
+                try:
+                    # Look for road numbers near flitser text
+                    road_xpath = f"//*[contains(text(), '{road}') and (contains(text(), 'flitser') or contains(text(), 'camera') or contains(text(), 'km '))]"
+                    road_elements = driver.find_elements(By.XPATH, road_xpath)
+                    
+                    for element in road_elements:
+                        # Include parent and sibling elements that might contain more info
+                        parent = element.find_element(By.XPATH, "./..")
+                        all_potential_elements.append(parent)
+                        all_potential_elements.append(element)
+                        
+                    if road_elements:
+                        print(f"Found {len(road_elements)} flitser elements mentioning {road}")
+                        
+                except:
+                    continue
+            
+            # Strategy 4: Look for numeric patterns that might indicate hectometer info
+            print("Searching for hectometer patterns...")
+            
+            try:
+                # Look for elements with km/hectometer patterns
+                hectometer_patterns = [
+                    "//*[contains(text(), 'km ') and (string-length(text()) < 200)]",
+                    "//*[contains(text(), 'hmp')]",
+                    "//*[contains(text(), 'hectometer')]"
+                ]
                 
+                for pattern in hectometer_patterns:
+                    try:
+                        elements = driver.find_elements(By.XPATH, pattern)
+                        # Only add if it also mentions roads or flitsers
+                        for element in elements:
+                            text = element.text.lower()
+                            if any(road.lower() in text for road in MONITORED_ROADS) or 'flitser' in text:
+                                all_potential_elements.append(element)
+                                
+                        if elements:
+                            print(f"Found {len(elements)} hectometer elements with pattern: {pattern}")
+                    except:
+                        continue
+                        
+            except Exception as e:
+                print(f"Hectometer search failed: {e}")
+            
+            # Process all potential elements
+            print(f"Processing {len(all_potential_elements)} potential flitser elements...")
+            
+            processed_texts = set()
+            for element in all_potential_elements:
+                try:
+                    element_text = element.text.strip()
+                    
+                    # Skip empty or very short text
+                    if not element_text or len(element_text) < 5:
+                        continue
+                    
+                    # Skip if already processed (avoid duplicates)
+                    text_hash = hash(element_text[:50])
+                    if text_hash in processed_texts:
+                        continue
+                    processed_texts.add(text_hash)
+                    
+                    # Check if this looks like flitser information
+                    text_lower = element_text.lower()
+                    
+                    # Flitser indicators
+                    has_flitser_terms = any(term in text_lower for term in ['flitser', 'camera', 'snelheid', 'controle', 'mobiel'])
+                    has_road = any(road.lower() in text_lower for road in MONITORED_ROADS)
+                    has_location_info = any(term in text_lower for term in ['km', 'hmp', 'hectometer', 'richting'])
+                    
+                    if (has_flitser_terms and has_road) or (has_flitser_terms and has_location_info):
+                        print(f"Potential flitser found: {element_text[:100]}...")
+                        
+                        # Extract information from this element
+                        flitser = self._parse_flitser_element(element_text, element)
+                        if flitser:
+                            speed_cameras.append(flitser)
+                
+                except Exception as e:
+                    continue
+            
+            print(f"Adaptive flitser extraction complete: {len(speed_cameras)} flitsers found")
+            return speed_cameras
+            
         except Exception as e:
-            print(f"Error in enhanced flitser extraction: {e}")
-        
-        print(f"Enhanced flitser extraction complete: {len(speed_cameras)} unique flitsers found")
-        return speed_cameras
+            print(f"Error in adaptive flitser extraction: {e}")
+            return []
 
     def _extract_detailed_flitser_info(self, text: str, idx: int) -> Dict:
         """Extract detailed flitser information including road, direction, and hectometer"""
