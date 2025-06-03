@@ -242,7 +242,7 @@ class ANWBScraper:
             chrome_options.binary_location = "/usr/bin/chromium"
             
             # Use system chromedriver with shorter timeouts
-            service = Service("/usr/bin/chromedriver")
+            service = ChromeService("/usr/bin/chromedriver")
             
             driver = webdriver.Chrome(service=service, options=chrome_options)
             
@@ -342,7 +342,22 @@ class ANWBScraper:
                 options.add_experimental_option("prefs", prefs)
                 
                 # Enhanced timeouts and error handling
-                service = webdriver.ChromeService(executable_path='/usr/bin/chromedriver')
+                try:
+                    # Try to use the system-installed chromedriver first
+                    service = ChromeService(executable_path='/usr/bin/chromedriver')
+                    print("Using system chromedriver: /usr/bin/chromedriver")
+                except Exception as e:
+                    print(f"System chromedriver failed: {e}")
+                    try:
+                        # Fallback to webdriver-manager
+                        service = ChromeService(ChromeDriverManager().install())
+                        print("Using webdriver-manager for chromedriver")
+                    except Exception as e2:
+                        print(f"Webdriver-manager failed: {e2}")
+                        # Last resort - try default service
+                        service = ChromeService()
+                        print("Using default chromedriver service")
+                
                 service.creation_flags = 0x08000000  # CREATE_NO_WINDOW for Windows compatibility
                 
                 # Create driver with timeout handling
