@@ -845,7 +845,11 @@ class ANWBScraper:
                                 # Check if this element mentions any monitored road
                                 mentioned_road = None
                                 for road in MONITORED_ROADS:
-                                    if road in element_text:
+                                    # Use exact road pattern matching to avoid false positives
+                                    import re
+                                    # Look for road at start of line or preceded by space
+                                    road_pattern = rf'\b{re.escape(road)}\b'
+                                    if re.search(road_pattern, element_text):
                                         mentioned_road = road
                                         break
                                 
