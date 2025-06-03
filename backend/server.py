@@ -256,6 +256,127 @@ class ANWBScraper:
             print(f"Error creating {session_type} driver session: {e}")
             return None
 
+    def _create_optimized_driver(self) -> webdriver.Chrome:
+        """Create optimized Chrome driver with enhanced error handling and fallback mechanisms"""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Creating Chrome driver (attempt {attempt + 1}/{max_retries})...")
+                
+                options = webdriver.ChromeOptions()
+                
+                # Core options for stability and performance
+                essential_options = [
+                    '--headless=new',
+                    '--no-sandbox', 
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-features=VizDisplayCompositor'
+                ]
+                
+                # Performance optimizations with error handling
+                performance_options = [
+                    '--disable-web-security',
+                    '--disable-features=TranslateUI',
+                    '--disable-ipc-flooding-protection',
+                    '--disable-renderer-backgrounding',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-background-timer-throttling',
+                    '--disable-client-side-phishing-detection',
+                    '--disable-default-apps',
+                    '--disable-hang-monitor',
+                    '--disable-popup-blocking',
+                    '--disable-prompt-on-repost',
+                    '--disable-sync',
+                    '--disable-translate',
+                    '--metrics-recording-only',
+                    '--no-first-run',
+                    '--safebrowsing-disable-auto-update',
+                    '--password-store=basic',
+                    '--use-mock-keychain',
+                    '--disable-component-extensions-with-background-pages',
+                    '--disable-blink-features=AutomationControlled'
+                ]
+                
+                # Memory and resource optimizations  
+                resource_options = [
+                    '--memory-pressure-off',
+                    '--max_old_space_size=4096',
+                    '--aggressive-cache-discard',
+                    '--disable-background-networking',
+                    '--disable-component-update',
+                    '--disable-domain-reliability'
+                ]
+                
+                # Add all options with error tolerance
+                all_options = essential_options + performance_options + resource_options
+                for option in all_options:
+                    try:
+                        options.add_argument(option)
+                    except Exception as e:
+                        print(f"Warning: Could not add option {option}: {e}")
+                
+                # Enhanced user agent for better compatibility
+                options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+                
+                # Window size for consistent rendering
+                options.add_argument('--window-size=1920,1080')
+                
+                # Prefs for additional optimization
+                prefs = {
+                    "profile.default_content_setting_values": {
+                        "images": 2,  # Block images for faster loading
+                        "plugins": 2,
+                        "popups": 2,
+                        "geolocation": 2,
+                        "notifications": 2,
+                        "media_stream": 2,
+                    },
+                    "profile.managed_default_content_settings": {
+                        "images": 2
+                    }
+                }
+                options.add_experimental_option("prefs", prefs)
+                
+                # Enhanced timeouts and error handling
+                service = webdriver.ChromeService()
+                service.creation_flags = 0x08000000  # CREATE_NO_WINDOW for Windows compatibility
+                
+                # Create driver with timeout handling
+                driver = webdriver.Chrome(service=service, options=options)
+                
+                # Configure enhanced timeouts with exponential backoff
+                base_timeout = 10 + (attempt * 5)  # Increase timeout with retries
+                driver.set_page_load_timeout(base_timeout)
+                driver.implicitly_wait(base_timeout // 2)
+                
+                # Test driver functionality
+                try:
+                    driver.get("about:blank")
+                    print("Driver created successfully and tested")
+                    return driver
+                except Exception as test_error:
+                    print(f"Driver test failed: {test_error}")
+                    try:
+                        driver.quit()
+                    except:
+                        pass
+                    raise test_error
+                    
+            except Exception as e:
+                print(f"Driver creation attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 1.5  # Exponential backoff
+                else:
+                    print("All driver creation attempts failed")
+                    raise Exception(f"Failed to create Chrome driver after {max_retries} attempts: {e}")
+        
+        raise Exception("Unexpected error in driver creation")
+
     def _extract_traffic_jams_fast(self, driver) -> List[Dict]:
         """Fast traffic jam extraction with minimal accordion interaction"""
         traffic_jams = []
